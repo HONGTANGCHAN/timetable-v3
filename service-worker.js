@@ -2,7 +2,7 @@
 // Service Worker（純靜態、無後端、無第三方 API）
 // ============================================================
 
-const CACHE_NAME = 'timetable-demo-v5.5.0';
+const CACHE_NAME = 'timetable-demo-v5.11.0';
 
 const PRECACHE = [
     './',
@@ -35,6 +35,8 @@ const PRECACHE = [
     './scripts/modules/expand/expand.css',
     './scripts/modules/calendar/calendar.js',
     './scripts/modules/calendar/calendar.css',
+    './scripts/modules/weather/weather.js',
+    './scripts/modules/weather/weather.css',
     './scripts/modules/search/search.css',
     './scripts/modules/profile/profile-content.js',
     './scripts/modules/profile/profile.js',

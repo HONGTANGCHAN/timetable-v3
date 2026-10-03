@@ -255,6 +255,7 @@ function initAppShell() {
     initSearch();
     initCardExpand();
     initCalendar();
+    if (typeof initWeather === 'function') initWeather();
     initProfile();
     if (typeof initAuth === 'function') initAuth();
     // 「選擇日期」chip（連同透明 <input type="date">）已徹底移除，

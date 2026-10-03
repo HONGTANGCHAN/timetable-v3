@@ -76,6 +76,7 @@
     <link rel="stylesheet" href="styles/pages/menu.css?v=3.0.0">
     <link rel="stylesheet" href="styles/pages/schedule.css?v=3.0.0">
     <link rel="stylesheet" href="styles/pages/realtime.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/weather/weather.css?v=1.4.0">
     <link rel="stylesheet" href="scripts/modules/search/search.css?v=3.1.1">
     <link rel="stylesheet" href="scripts/modules/theme/theme.css?v=3.0.0">
     <link rel="stylesheet" href="scripts/modules/weekly/weekly.css?v=3.4.0">
@@ -179,6 +180,32 @@
                 <div class="time" id="live-clock">00:00:00</div>
                 <div class="utc">UTC+8</div>
             </div>
+            <section class="realtime-weather" id="realtime-weather" data-state="loading" aria-live="polite">
+                <div class="weather-card__visual">
+                    <div class="weather-card__icon" id="weather-card-icon" aria-hidden="true">⛅</div>
+                </div>
+                <div class="weather-card__body">
+                    <div class="weather-card__heading">
+                        <span class="weather-card__location">澳門</span>
+                        <span class="weather-card__separator" aria-hidden="true">·</span>
+                        <span class="weather-card__description" id="weather-card-description">正在載入天氣…</span>
+                    </div>
+                    <div class="weather-card__temperature">
+                        <span id="weather-card-temperature">--</span><small>°C</small>
+                    </div>
+                    <div class="weather-card__pills">
+                        <div class="weather-card__detail">
+                            <span>濕度</span>
+                            <strong id="weather-card-humidity">--%</strong>
+                        </div>
+                        <div class="weather-card__detail">
+                            <span>今日</span>
+                            <strong id="weather-card-range">-- / --°C</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="weather-card__warnings" id="weather-card-warnings" hidden></div>
+            </section>
             <div class="status-container" id="status-container"></div>
             <div class="overtime-slot" id="overtime-slot"></div>
         </section>
@@ -587,17 +614,18 @@
 <script src="scripts/modules/animations/animations.js?v=3.0.0"></script>
 <script src="scripts/modules/expand/expand.js?v=3.0.0"></script>
 <script src="scripts/modules/calendar/calendar.js?v=3.0.0"></script>
+<script src="scripts/modules/weather/weather.js?v=1.6.0"></script>
 <script src="scripts/modules/profile/profile-content.js?v=3.0.0"></script>
 <script src="scripts/modules/profile/profile.js?v=3.0.0"></script>
 <script src="scripts/modules/auth/auth-mock.js?v=3.1.1"></script>
 <script src="scripts/modules/overtime/overtime.js?v=3.0.0"></script>
 <script src="scripts/modules/liquidglass/liquidglass.js?v=3.0.0"></script>
-<script src="scripts/main.js?v=3.3.0"></script>
+<script src="scripts/main.js?v=3.6.0"></script>
 
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-        navigator.serviceWorker.register('service-worker.js?v=5.5.0')
+        navigator.serviceWorker.register('service-worker.js?v=5.11.0')
             .then(function (registration) { registration.update(); })
             .catch(function (error) { console.log('Service Worker 註冊失敗:', error); });
     });

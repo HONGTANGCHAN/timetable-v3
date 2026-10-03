@@ -1011,6 +1011,22 @@
     min-width: 58px;
 }
 
+/* 橫向滑動時固定左側時間欄，滑到星期六仍看得到節次。 */
+.weekly-table .period-col {
+    position: sticky;
+    left: 0;
+    z-index: 6;
+    background: var(--card-purple);
+}
+
+.weekly-table .period-cell {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: var(--btn-bg);
+    box-shadow: 8px 0 12px -12px rgba(0, 0, 0, 0.42);
+}
+
 .weekly-table thead th:not(.period-col),
 .weekly-table tbody td:not(.period-cell) {
     width: 82px;

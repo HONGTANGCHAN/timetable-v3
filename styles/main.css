@@ -561,27 +561,25 @@ body > *:not(.phone-mockup) {
         background-color: var(--bg-color);
     }
 
-    /* 整個 App 容器剛好等於一個畫面高度，並且係 flex column */
+    /* 手機版讓整頁自然延伸：內容不足時仍佔滿視口，內容過長時正常縱向滾動。 */
     body {
         padding: 0;
         align-items: stretch;
-        height: 100vh;
-        height: 100dvh;
         min-height: 100vh;
         min-height: 100dvh;
         background-color: var(--bg-color);
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: auto;
     }
 
     .phone-mockup {
         max-width: 100%;
         width: 100%;
-        /* 100vh 係舊 iOS（未支援 dvh）嘅後備，避免停留喺桌面版嘅 956px
-           而令底部露出一大塊空白；100dvh 會隨工具列收合即時重算 */
-        height: 100vh;
-        height: 100dvh;
         min-height: 100vh;
         min-height: 100dvh;
+        height: auto;
+        max-height: none;
+        overflow: visible;
         border-radius: 0;
         box-shadow: none;
         /* 頂部安全區域改由 #app-header 統一處理，
@@ -606,7 +604,7 @@ body > *:not(.phone-mockup) {
 
     #app-content {
         padding: var(--spacing-sm) var(--spacing-md);
-        /* 內容滾到底時唔會被底部膠囊擋住 */
-        padding-bottom: var(--spacing-md);
+        padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom, 0px));
+        overflow: visible;
     }
 }

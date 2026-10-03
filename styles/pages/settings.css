@@ -1,0 +1,257 @@
+/* ============================================================
+   公開設定頁與整體視覺整理
+   只處理樣式、間距、狀態與響應式，不改變既有頁面結構。
+   ============================================================ */
+
+.header-user {
+    padding: 0 11px 0 5px;
+}
+
+.header-user__icon {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 9px;
+    background: rgba(128, 128, 128, 0.12);
+    color: var(--text-main);
+}
+
+:root[data-theme="light"] .header-user__icon {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.header-user:hover .header-user__icon {
+    background: rgba(128, 128, 128, 0.2);
+}
+
+.settings-intro {
+    margin: -4px 4px -8px;
+}
+
+.settings-intro__title {
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--text-main);
+    line-height: 1.2;
+}
+
+.settings-intro__desc {
+    margin-top: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.ios-row__value {
+    max-width: 42%;
+}
+
+.class-stage {
+    margin-bottom: 18px;
+}
+
+.class-stage__label {
+    margin: 0 0 9px 4px;
+    font-size: 12px;
+    font-weight: 750;
+    color: var(--text-muted);
+}
+
+.class-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.class-chip {
+    min-height: 66px;
+    padding: 12px;
+    border: 1px solid var(--lg-card-border);
+    border-radius: 16px;
+    background: var(--lg-card-bg);
+    color: var(--text-main);
+    text-align: left;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.class-chip__name,
+.class-chip__code {
+    display: block;
+}
+
+.class-chip__name {
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.class-chip__code {
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.class-chip:hover {
+    background: rgba(128, 128, 128, 0.16);
+    transform: translateY(-1px);
+}
+
+.class-chip:active {
+    transform: scale(0.97);
+}
+
+.class-chip.is-on {
+    border-color: var(--ios-blue);
+    background: rgba(10, 132, 255, 0.16);
+    box-shadow: 0 0 0 1px var(--ios-blue) inset;
+}
+
+.class-chip.is-on .class-chip__code {
+    color: var(--ios-blue);
+}
+
+.class-custom {
+    display: flex;
+    gap: 8px;
+}
+
+.class-custom .auth-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.class-custom__go {
+    flex: 0 0 auto;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--ios-blue);
+    color: #fff;
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.class-custom__go:active {
+    transform: scale(0.96);
+}
+
+.class-picked {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(48, 209, 88, 0.32);
+    background: rgba(48, 209, 88, 0.1);
+}
+
+.class-picked__icon {
+    flex: 0 0 auto;
+    color: var(--ios-green);
+}
+
+.class-picked__text {
+    min-width: 0;
+}
+
+.class-picked__name {
+    display: block;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.class-picked__desc {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.faq-card {
+    padding: 15px 18px;
+}
+
+.faq-q {
+    font-size: 14px;
+    font-weight: 850;
+    line-height: 1.45;
+    color: var(--text-main);
+}
+
+.faq-a {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1.65;
+    color: var(--text-muted);
+}
+
+.detail-invite {
+    padding: 12px 2px;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+
+/* 課表與資訊卡：更清楚的 hover / 當前狀態回饋 */
+.class-card,
+.status-card,
+.holiday-card,
+.schedule-header,
+.realtime-clock,
+.ios-card {
+    transition: transform 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease;
+}
+
+.class-card:hover,
+.holiday-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+.class-card.is-now {
+    box-shadow: 0 0 0 2px var(--now-red), 0 10px 30px rgba(255, 59, 48, 0.22);
+}
+
+.nav-item:hover {
+    color: var(--text-main);
+    transform: translateY(-1px);
+}
+
+.cal-cell:hover {
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.cal-cell.today {
+    box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.45) inset;
+}
+
+@media (max-width: 500px) {
+    .settings-intro__title {
+        font-size: 22px;
+    }
+
+    .class-grid {
+        gap: 8px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .class-card,
+    .status-card,
+    .holiday-card,
+    .schedule-header,
+    .realtime-clock,
+    .ios-card,
+    .class-chip,
+    .nav-item {
+        transition: none;
+    }
+}

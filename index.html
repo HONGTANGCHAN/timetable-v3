@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f1117">
+    <meta name="description" content="以獨立示範資料運作的課表、假期與校曆應用程式">
+    <title>我的課表</title>
+
+    <script>
+    (function () {
+        var saved = 'auto';
+        try { saved = localStorage.getItem('theme') || 'auto'; } catch (e) {}
+        var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = saved === 'light' || saved === 'dark' ? saved : (systemDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.setProperty('--boot-bg', theme === 'dark' ? '#0f1117' : '#F2F2F7');
+        window.__BOOT_T0 = (performance && performance.now) ? performance.now() : Date.now();
+    })();
+    </script>
+
+    <style id="splash-critical-css">
+        html { background: var(--boot-bg, #0f1117); }
+        body { margin: 0; background: var(--boot-bg, #0f1117); }
+        #splash-screen {
+            position: fixed; inset: 0; z-index: 99999; display: flex;
+            align-items: center; justify-content: center; overflow: hidden;
+            background: var(--boot-bg, #0f1117);
+            transition: opacity .2s linear;
+        }
+        #splash-screen .splash-logo {
+            width: 160px; height: 160px; max-width: 160px; max-height: 160px;
+            flex: 0 0 auto; animation: splashBreath 1.8s ease-in-out infinite;
+        }
+        #splash-screen .splash-logo__img {
+            display: block; width: 100%; height: 100%; object-fit: contain;
+            border-radius: 38px;
+        }
+        #splash-screen .made-in-macau {
+            position: absolute; bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+            color: var(--text-muted, #94a3b8); font: 700 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+            letter-spacing: .4px;
+        }
+        #splash-screen .splash-status {
+            position: absolute; bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+            color: var(--text-muted, #94a3b8); font: 600 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+            opacity: 0; transition: opacity .2s ease;
+        }
+        #splash-screen.splash-waiting .splash-status { opacity: .82; }
+        #splash-screen.splash-leaving .splash-logo {
+            animation: none; transform: scale(1.08); transition: transform .45s cubic-bezier(.16,1,.3,1);
+        }
+        #splash-screen.hidden { opacity: 0; pointer-events: none; }
+        @keyframes splashBreath {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-5px) scale(1.025); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #splash-screen .splash-logo { animation: none; }
+            #splash-screen.splash-leaving .splash-logo { transition: none; }
+        }
+    </style>
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="assets/images/app-logo.svg?v=3.0.0">
+    <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+
+    <link rel="stylesheet" href="styles/main.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/icons.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/themes/dark.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/themes/light.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/components/cards.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/components/buttons.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/components/animations.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/pages/menu.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/pages/schedule.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/pages/realtime.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/search/search.css?v=3.1.1">
+    <link rel="stylesheet" href="scripts/modules/theme/theme.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/weekly/weekly.css?v=3.3.2">
+    <link rel="stylesheet" href="scripts/modules/holidays/holidays.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/expand/expand.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/calendar/calendar.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/profile/profile.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/auth/auth.css?v=3.1.1">
+    <link rel="stylesheet" href="scripts/modules/overtime/overtime.css?v=3.0.0">
+    <link rel="stylesheet" href="scripts/modules/liquidglass/liquidglass.css?v=3.0.0">
+    <link rel="stylesheet" href="styles/pages/settings.css?v=3.0.0">
+</head>
+<body>
+
+<div id="splash-screen" role="status" aria-live="polite">
+    <div class="splash-logo">
+        <img class="app-logo splash-logo__img" src="assets/images/app-logo.svg?v=3.0.0"
+             width="160" height="160" fetchpriority="high" decoding="async" alt="我的課表">
+    </div>
+    <div class="made-in-macau">🇲🇴 澳門製造</div>
+    <div class="splash-status" id="splash-status"></div>
+</div>
+
+<div class="phone-mockup">
+    <div class="dynamic-island"></div>
+    <div class="status-bar"></div>
+
+    <header id="app-header">
+        <div class="header-top">
+            <div class="header-brand">
+                <img class="header-logo" src="assets/images/app-logo.svg?v=3.0.0"
+                     alt="" aria-hidden="true" width="30" height="30">
+                <div class="header-title" id="header-title">我的課表</div>
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle-corner" id="theme-toggle" type="button"
+                        onclick="toggleTheme()" aria-label="切換深色 / 淺色模式">
+                    <span class="theme-icon" id="theme-icon" data-icon="sun" data-icon-size="20"></span>
+                </button>
+                <button class="header-user header-auth" id="header-auth" type="button"
+                        onclick="authMockOpen()" aria-label="登入或註冊">
+                    <span class="header-user__icon" data-icon="user" data-icon-size="18" aria-hidden="true"></span>
+                    <span class="header-user__name">登入</span>
+                </button>
+                <button class="header-user" id="header-user" type="button"
+                        onclick="openProfilePanel()" aria-label="開啟設定">
+                    <span class="header-user__icon" data-icon="sliders" data-icon-size="18" aria-hidden="true"></span>
+                    <span class="header-user__name">設定</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="search-container">
+            <span class="search-icon" data-icon="search" data-icon-size="17" aria-hidden="true"></span>
+            <input type="text" id="search-input" placeholder="搜尋科目、老師或日期...">
+            <div id="search-results" class="search-results"></div>
+        </div>
+    </header>
+
+    <main id="app-content">
+        <section id="page-weekly" class="page">
+            <div class="weekly-header">
+                <div class="title">本週課表總覽</div>
+            </div>
+            <div class="schedule-notice" id="schedule-notice">
+                <span class="schedule-notice__icon" data-icon="info" data-icon-size="15"></span>
+                <span id="schedule-notice-text"></span>
+            </div>
+            <div class="class-prompt" id="class-prompt">
+                <span class="class-prompt__icon" data-icon="book" data-icon-size="30"></span>
+                <div class="class-prompt__title">請先選擇班級</div>
+                <div class="class-prompt__desc">選好班級便會載入對應課表。</div>
+                <button class="class-prompt__btn" type="button" onclick="openProfilePanel('class')">選擇班級</button>
+            </div>
+            <div class="weekly-grid" id="weekly-grid-container">
+                <div id="skeleton-grid" aria-hidden="true">
+                    <span class="skeleton-bar"></span><span class="skeleton-bar"></span>
+                    <span class="skeleton-bar"></span><span class="skeleton-bar"></span>
+                    <span class="skeleton-bar"></span><span class="skeleton-bar"></span>
+                </div>
+            </div>
+        </section>
+
+        <section id="page-schedule" class="page">
+            <div class="schedule-header">
+                <div class="title" id="schedule-title-text">課表</div>
+                <div class="date" id="schedule-date-text">載入中...</div>
+                <div class="schedule-datebar">
+                    <button class="schedule-chip" type="button" id="schedule-quick-today"
+                            aria-pressed="false" onclick="scheduleSelectToday()">今天</button>
+                    <button class="schedule-chip" type="button" id="schedule-quick-tomorrow"
+                            aria-pressed="false" onclick="scheduleSelectTomorrow()">明天</button>
+                </div>
+            </div>
+            <div class="schedule-list" id="schedule-list-container"></div>
+        </section>
+
+        <section id="page-realtime" class="page active">
+            <div class="realtime-clock">
+                <div class="label">即時時間</div>
+                <div class="time" id="live-clock">00:00:00</div>
+                <div class="utc">UTC+8</div>
+            </div>
+            <div class="status-container" id="status-container"></div>
+            <div class="overtime-slot" id="overtime-slot"></div>
+        </section>
+
+        <section id="page-holidays" class="page">
+            <div class="holidays-header">
+                <div class="title">下一個假期</div>
+            </div>
+            <div class="holidays-container" id="holidays-container"></div>
+        </section>
+
+        <section id="page-calendar" class="page">
+            <div class="cal-toolbar">
+                <button class="cal-today-btn" type="button" onclick="goToCalendarToday()">今天</button>
+                <button class="cal-nav-btn" type="button" onclick="changeCalendarMonth(-1)" aria-label="上個月">
+                    <span data-icon="chevronLeft" data-icon-size="16"></span>
+                </button>
+                <button class="cal-nav-btn" type="button" onclick="changeCalendarMonth(1)" aria-label="下個月">
+                    <span data-icon="chevronRight" data-icon-size="16"></span>
+                </button>
+                <div class="cal-title" id="calendar-title">2026年10月</div>
+            </div>
+            <div class="cal-weekdays">
+                <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+            </div>
+            <div class="cal-grid" id="calendar-grid"></div>
+            <div class="cal-day-events">
+                <div class="cal-day-title" id="calendar-events-title">今日事件</div>
+                <div class="cal-day-list" id="calendar-events-list"></div>
+            </div>
+        </section>
+    </main>
+
+    <nav id="bottom-nav" aria-label="主要功能">
+        <div class="nav-capsule"
+             data-config='{"blurAmount":0.5,"refraction":0.72,"chromAberration":0.06,"edgeHighlight":0.09,"specular":0.38,"fresnel":1,"distortion":0.12,"cornerRadius":30,"zRadius":26,"opacity":1,"saturation":0.6,"tintStrength":0.06,"brightness":0.02,"shadowOpacity":0.28,"shadowSpread":18,"shadowOffsetY":6}'>
+            <div class="nav-trail" id="nav-trail" aria-hidden="true"></div>
+            <div class="nav-indicator" id="nav-indicator"
+                 data-config='{"blurAmount":0.55,"refraction":0.8,"chromAberration":0.09,"edgeHighlight":0.14,"specular":0.5,"fresnel":1,"distortion":0.18,"cornerRadius":24,"zRadius":20,"opacity":1,"saturation":0.8,"tintStrength":0.08,"brightness":0.04,"shadowOpacity":0.22,"shadowSpread":14,"shadowOffsetY":5}'></div>
+
+            <button type="button" class="nav-item active" data-tab="page-weekly">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="7.5" height="7.5" rx="2"></rect>
+                        <rect x="13.5" y="3" width="7.5" height="7.5" rx="2"></rect>
+                        <rect x="3" y="13.5" width="7.5" height="7.5" rx="2"></rect>
+                        <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"></rect>
+                    </svg>
+                </span>
+                <span class="nav-label">週覽</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="page-schedule">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 7.2v13.3"></path>
+                        <path d="M2.8 18.4a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1h5.4a4 4 0 0 1 3.8 2.5 4 4 0 0 1 3.8-2.5h5.4a1 1 0 0 1 1 1v13.2a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"></path>
+                    </svg>
+                </span>
+                <span class="nav-label">課表</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="page-realtime">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M10 2h4"></path><path d="M12 14v-4"></path><circle cx="12" cy="14" r="8"></circle>
+                    </svg>
+                </span>
+                <span class="nav-label">倒數</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="page-holidays">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M10.9 21c.3-4.4 1.4-7.9 2.9-10.8"></path>
+                        <path d="M13.8 10.2C11.6 8.1 8.6 7.6 6.1 9"></path>
+                        <path d="M13.8 10.2C12.6 7.4 10.2 5.7 7.4 6.1"></path>
+                        <path d="M13.8 10.2c2.4-2 5.4-2 7.8 0"></path>
+                        <path d="M13.8 10.2c2-2.6 2.4-5.8 1.2-8.7"></path>
+                        <path d="M7.6 21h8"></path>
+                    </svg>
+                </span>
+                <span class="nav-label">假期</span>
+            </button>
+            <button type="button" class="nav-item" data-tab="page-calendar">
+                <span class="nav-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="4.5" width="18" height="16.5" rx="3"></rect>
+                        <path d="M3 10h18M8 2.5v4M16 2.5v4"></path>
+                        <circle cx="8.4" cy="14.4" r=".9"></circle><circle cx="12" cy="14.4" r=".9"></circle>
+                        <circle cx="15.6" cy="14.4" r=".9"></circle><circle cx="8.4" cy="18" r=".9"></circle>
+                        <circle cx="12" cy="18" r=".9"></circle><circle cx="15.6" cy="18" r=".9"></circle>
+                    </svg>
+                </span>
+                <span class="nav-label">月曆</span>
+            </button>
+        </div>
+    </nav>
+</div>
+
+<div class="profile-overlay" id="profile-overlay">
+    <div class="profile-panel">
+        <div class="profile-aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+        <header class="profile-topbar">
+            <button class="profile-close" id="profile-back" type="button"
+                    onclick="profileBackView()" aria-label="返回" style="display:none;">
+                <span data-icon="chevronLeft" data-icon-size="17"></span>
+            </button>
+            <div class="profile-topbar__title" id="profile-topbar-title">設定</div>
+            <button class="profile-close" id="profile-close" type="button"
+                    onclick="closeProfilePanel()" aria-label="關閉">
+                <span data-icon="close" data-icon-size="15"></span>
+            </button>
+        </header>
+
+        <div class="profile-scroll" id="profile-scroll">
+            <section class="profile-view is-on" id="profile-view-home">
+                <div class="ios-home">
+                    <header class="wa-head settings-intro">
+                        <div class="wa-tools">
+                            <button class="wa-iconbtn" id="wa-search-btn" type="button"
+                                    onclick="profileToggleSettingsSearch()" aria-label="搜尋設定"
+                                    aria-expanded="false" aria-controls="wa-search-bar">
+                                <span data-icon="search" data-icon-size="19"></span>
+                            </button>
+                        </div>
+                        <div class="wa-search" id="wa-search-bar" hidden>
+                            <span class="wa-search__icon" data-icon="search" data-icon-size="16" aria-hidden="true"></span>
+                            <input class="wa-search__input" id="wa-search-input" type="search"
+                                   placeholder="搜尋設定" aria-label="搜尋設定"
+                                   autocomplete="off" oninput="profileFilterSettings(this.value)">
+                            <button class="wa-search__clear" type="button" onclick="profileClearSettingsSearch()"
+                                    aria-label="清除搜尋">
+                                <span data-icon="close" data-icon-size="13"></span>
+                            </button>
+                        </div>
+                        <div class="settings-intro__title">設定</div>
+                        <div class="settings-intro__desc">調整課表、顯示與本機偏好</div>
+                    </header>
+
+                    <p class="ios-group-title">課表</p>
+                    <section class="ios-card">
+                        <div class="ios-list">
+                            <button class="ios-row" type="button" onclick="profileOpenClassPicker()">
+                                <span class="ios-row__icon" data-icon="school" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">班級與課表</span></span>
+                                <span class="ios-row__value" id="settings-class-value">示範一班</span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('overtime')">
+                                <span class="ios-row__icon" data-icon="trophy" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">老師拖堂排行榜</span></span>
+                                <span class="tag-pill tag-pill--beta">Beta</span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <p class="ios-group-title">顯示與儲存</p>
+                    <section class="ios-card">
+                        <div class="ios-list">
+                            <button class="ios-row" type="button" onclick="profilePushDetail('appearance')">
+                                <span class="ios-row__icon" data-icon="palette" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">外觀與主題</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('privacy')">
+                                <span class="ios-row__icon" data-icon="lock" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">私隱</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('storage')">
+                                <span class="ios-row__icon" data-icon="arrowsUpDown" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">儲存空間及數據</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <p class="ios-group-title">支援</p>
+                    <section class="ios-card">
+                        <div class="ios-list">
+                            <button class="ios-row" type="button" onclick="profilePushDetail('faq')">
+                                <span class="ios-row__icon" data-icon="help" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">常見問題</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('feedback')">
+                                <span class="ios-row__icon" data-icon="pencil" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">回報問題 / 意見反饋</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('contact')">
+                                <span class="ios-row__icon" data-icon="chat" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">聯絡支援</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <p class="ios-group-title">法律與關於</p>
+                    <section class="ios-card">
+                        <div class="ios-list">
+                            <button class="ios-row" type="button" onclick="profilePushDetail('doc-disclaimer')">
+                                <span class="ios-row__icon" data-icon="alert" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">免責聲明</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('doc-terms')">
+                                <span class="ios-row__icon" data-icon="book" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">服務條款</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('doc-privacy')">
+                                <span class="ios-row__icon" data-icon="lock" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">私隱政策</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('doc-licensing')">
+                                <span class="ios-row__icon" data-icon="shield" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">條款與許可</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('invite')">
+                                <span class="ios-row__icon" data-icon="gift" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">邀請朋友</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                            <button class="ios-row" type="button" onclick="profilePushDetail('about')">
+                                <span class="ios-row__icon" data-icon="info" data-icon-size="22"></span>
+                                <span class="ios-row__body"><span class="ios-row__label">關於我們</span></span>
+                                <span class="ios-row__chevron" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <p class="wa-search-empty" id="wa-search-empty" hidden>
+                        沒有符合「<span id="wa-search-empty-word"></span>」的設定
+                    </p>
+                    <footer class="profile-footer">
+                        <p class="profile-footer__note">我的課表 · 本機示範資料</p>
+                        <p class="profile-footer__version" id="app-version">v3.5.1</p>
+                    </footer>
+                </div>
+            </section>
+
+            <section class="profile-view" id="profile-view-class">
+                <div class="ios-home">
+                    <div class="auth-hero auth-hero--compact">
+                        <div class="auth-hero__badge">
+                            <img class="app-logo" src="assets/images/app-logo.svg?v=3.0.0" alt="我的課表" width="64" height="64">
+                        </div>
+                        <h2 class="auth-hero__title">選擇你的班級</h2>
+                        <p class="auth-hero__desc">班級只決定載入哪一份示範課表。</p>
+                    </div>
+                    <div class="class-picked" id="class-picked" style="display:none;">
+                        <span class="class-picked__icon" data-icon="checkCircle" data-icon-size="18"></span>
+                        <span class="class-picked__text">
+                            <span class="class-picked__name" id="class-picked-name">—</span>
+                            <span class="class-picked__desc" id="class-picked-desc"></span>
+                        </span>
+                    </div>
+                    <div id="class-groups"></div>
+                    <div class="glass-card" id="class-custom-card">
+                        <span class="auth-field__label">找不到你的班級？自行輸入</span>
+                        <div class="class-custom">
+                            <input id="class-custom-input" class="auth-input" type="text" maxlength="20"
+                                   placeholder="例如：示範四班" autocomplete="off">
+                            <button class="class-custom__go" type="button" onclick="profileApplyCustomClass()">套用</button>
+                        </div>
+                    </div>
+                    <button class="btn-primary-block" id="class-submit" type="button"
+                            onclick="profileConfirmClass()">進入我的課表</button>
+                    <p class="auth-footnote">可隨時在設定中更改</p>
+                </div>
+            </section>
+        </div>
+
+        <section class="sub-page" id="profile-subpage" aria-hidden="true">
+            <header class="sub-page__nav">
+                <div class="sub-page__nav-row">
+                    <button class="back-btn" id="subpage-back" type="button"
+                            onclick="profileBackView()" aria-label="返回">
+                        <span class="back-btn__icon" data-icon="chevronLeft" data-icon-size="18"></span>
+                    </button>
+                    <h1 class="sub-page__title" id="subpage-title">
+                        <span class="sub-page__title-text" id="subpage-title-text"></span>
+                        <span class="beta-badge" id="subpage-title-badge" hidden>Beta</span>
+                    </h1>
+                    <button class="sub-page__more" id="subpage-more" type="button"
+                            onclick="profileMoreAction()" aria-label="更多選項" style="display:none;">
+                        <span data-icon="moreHorizontal" data-icon-size="19"></span>
+                    </button>
+                </div>
+            </header>
+            <div class="sub-page__body" id="subpage-body">
+                <section class="profile-view" id="profile-view-detail">
+                    <div class="ios-home" id="profile-detail-body"></div>
+                </section>
+            </div>
+        </section>
+    </div>
+</div>
+
+<div class="profile-toast" id="profile-toast" role="status" aria-live="polite"></div>
+
+<div class="auth-mock-overlay" id="auth-overlay">
+    <div class="auth-mock-panel">
+        <header class="auth-mock-topbar">
+            <div class="auth-mock-title" id="auth-mock-title">登入 / 註冊</div>
+            <button class="profile-close" type="button" onclick="authMockClose()" aria-label="關閉">
+                <span data-icon="close" data-icon-size="15"></span>
+            </button>
+        </header>
+
+        <div class="auth-mock-scroll">
+            <section class="auth-mock-view is-on" id="auth-mock-view-form">
+                <div class="auth-mock-hero">
+                    <img class="app-logo auth-mock-logo" src="assets/images/app-logo.svg?v=3.1.0"
+                         alt="我的課表" width="72" height="72">
+                    <h2 class="auth-mock-hero__title" id="auth-mock-hero-title">歡迎回來</h2>
+                    <p class="auth-mock-hero__desc" id="auth-mock-hero-desc">
+                        使用本機帳號繼續，資料不會傳送到任何伺服器。
+                    </p>
+                </div>
+
+                <div class="auth-mock-tabs" role="tablist" aria-label="登入或註冊">
+                    <button class="auth-mock-tab is-on" id="auth-mode-login" type="button"
+                            role="tab" onclick="authMockSetMode('login')">登入</button>
+                    <button class="auth-mock-tab" id="auth-mode-register" type="button"
+                            role="tab" onclick="authMockSetMode('register')">註冊</button>
+                </div>
+
+                <div class="auth-mock-alert" id="auth-mock-alert" role="alert"></div>
+
+                <form class="auth-mock-form" id="auth-mock-form" novalidate>
+                    <label class="auth-mock-field" id="auth-register-name-field" hidden>
+                        <span class="auth-mock-field__label">姓名 / 帳號名稱</span>
+                        <input class="auth-mock-input" id="auth-mock-name" type="text"
+                               maxlength="30" autocomplete="name" placeholder="例如：陳小明">
+                    </label>
+                    <label class="auth-mock-field">
+                        <span class="auth-mock-field__label">Email</span>
+                        <input class="auth-mock-input" id="auth-mock-email" type="email"
+                               inputmode="email" autocomplete="email" placeholder="you@example.com">
+                    </label>
+                    <label class="auth-mock-field">
+                        <span class="auth-mock-field__label">密碼</span>
+                        <input class="auth-mock-input" id="auth-mock-password" type="password"
+                               autocomplete="current-password" placeholder="至少 6 個字元">
+                    </label>
+                    <label class="auth-mock-field" id="auth-register-confirm-field" hidden>
+                        <span class="auth-mock-field__label">確認密碼</span>
+                        <input class="auth-mock-input" id="auth-mock-confirm" type="password"
+                               autocomplete="new-password" placeholder="再輸入一次">
+                    </label>
+                    <button class="auth-mock-submit" id="auth-mock-submit" type="submit">登入</button>
+                </form>
+                <p class="auth-mock-note">
+                    這是本機模擬帳號。帳號與 Session 只儲存在目前瀏覽器，不代表真實身份驗證。
+                </p>
+            </section>
+
+            <section class="auth-mock-view" id="auth-mock-view-account">
+                <div class="auth-account-head">
+                    <div class="auth-account-avatar" id="auth-account-avatar">A</div>
+                    <div class="auth-account-name" id="auth-account-name">—</div>
+                    <div class="auth-account-email" id="auth-account-email">—</div>
+                </div>
+
+                <section class="ios-card">
+                    <div class="ios-list">
+                        <div class="ios-row" role="note">
+                            <span class="ios-row__body"><span class="ios-row__label">帳號 ID</span></span>
+                            <span class="ios-row__value" id="auth-account-id">—</span>
+                        </div>
+                        <div class="ios-row" role="note">
+                            <span class="ios-row__body"><span class="ios-row__label">註冊日期</span></span>
+                            <span class="ios-row__value" id="auth-account-created">—</span>
+                        </div>
+                        <div class="ios-row" role="note">
+                            <span class="ios-row__body"><span class="ios-row__label">目前 Session</span></span>
+                            <span class="ios-row__value" id="auth-account-token">—</span>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="auth-account-actions">
+                    <button class="auth-logout-btn" type="button" onclick="authMockLogout()">登出</button>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script src="data/demo-data.js?v=3.0.0"></script>
+<script src="scripts/utils/storage.js?v=3.0.0"></script>
+<script src="scripts/utils/icons.js?v=3.0.0"></script>
+<script src="scripts/utils/db.js?v=3.0.0"></script>
+<script src="scripts/config/app-config.js?v=3.0.0"></script>
+<script src="scripts/modules/theme/theme.js?v=3.0.0"></script>
+<script src="scripts/modules/weekly/weekly.js?v=3.2.2"></script>
+<script src="scripts/modules/holidays/holidays.js?v=3.0.0"></script>
+<script src="scripts/modules/animations/animations.js?v=3.0.0"></script>
+<script src="scripts/modules/expand/expand.js?v=3.0.0"></script>
+<script src="scripts/modules/calendar/calendar.js?v=3.0.0"></script>
+<script src="scripts/modules/profile/profile-content.js?v=3.0.0"></script>
+<script src="scripts/modules/profile/profile.js?v=3.0.0"></script>
+<script src="scripts/modules/auth/auth-mock.js?v=3.1.1"></script>
+<script src="scripts/modules/overtime/overtime.js?v=3.0.0"></script>
+<script src="scripts/modules/liquidglass/liquidglass.js?v=3.0.0"></script>
+<script src="scripts/main.js?v=3.3.0"></script>
+
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('service-worker.js?v=5.3.2')
+            .then(function (registration) { registration.update(); })
+            .catch(function (error) { console.log('Service Worker 註冊失敗:', error); });
+    });
+}
+</script>
+</body>
+</html>

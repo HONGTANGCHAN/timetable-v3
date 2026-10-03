@@ -1,0 +1,2658 @@
+/* ============================================================
+   模組：用戶登入 / 個人中心（Auth / Profile Switcher）
+   1) Header 用戶膠囊  2) 全螢幕玻璃面板  3) 未登入 Auth 表單
+   4) 已登入 iOS 18 分組卡片個人主頁
+      4-1 身份區（WhatsApp 設定頁風格：狀態氣泡／大圓頭像／名稱／@handle）
+      4-2 清單項目  4-3 圖示配色  4-4 頁尾版本號
+      4-5 分組小標題（.ios-group-title）＋ 子頁面表單卡（.detail-form / .detail-field）
+      4-6 子頁面共用元件（.detail-action 操作列 / .detail-stat 統計列 /
+          .detail-row 開關列 / FAQ / 法律條文 / 邀請連結 / 強調卡 /
+          App 資訊區塊版本號）
+   5) 切換帳號清單 + 子頁面（帳戶列表 / 密碼 / 電郵 / 安全通知 / 用戶名稱 / 外觀 /
+      已連結裝置 / 私隱 / 儲存空間 / 常見問題 / 回報問題 / 聯絡支援 /
+      四篇法律條文 / 邀請朋友 / 帳戶選項 / 登出）
+      ⚠ 通用模態抽屜（.ios-sheet*）已徹底刪除，全站冇任何 Modal 彈窗。
+   6) 響應式 / 主題 / Toast
+
+   本檔只服務公開設定頁；登入、帳號與雲端同步介面已移除。
+   ============================================================ */
+
+/* ================= 1. Header 用戶膠囊 ================= */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* 標題維持單行，唔會被右側用戶膠囊擠到換行 */
+.header-top .header-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.header-user {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    /* 44×44 觸控熱區（Apple HIG）：視覺仍是 34px 膠囊，但整個 44px 都可點 */
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 11px 0 3px;
+    border: none;
+    border-radius: 22px;
+    background-color: transparent;
+    color: var(--text-main);
+    font-family: var(--font-family);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    max-width: 152px;
+    transition: transform 0.25s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 膠囊本體：上下各內縮 5px，在 44px 熱區內維持 34px 高的視覺 */
+.header-user::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    bottom: 5px;
+    border-radius: 17px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.09);
+    pointer-events: none;
+    transition: background-color 0.25s ease;
+}
+
+.header-user > * { position: relative; }
+
+.header-user:hover::before { background-color: rgba(128, 128, 128, 0.22); }
+.header-user:active { transform: scale(0.94); }
+
+.header-user__avatar,
+.header-user__icon {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border-radius: 50%;
+    display: block;
+}
+
+.header-user__avatar {
+    object-fit: cover;
+    background-color: var(--bg-secondary);
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.header-user__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(140deg, #6a5cff, #ff5f9e 55%, #00d4ff);
+}
+
+.header-user__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 106px;
+}
+
+:root[data-theme="light"] .header-user::before {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .header-user__avatar { border-color: rgba(0, 0, 0, 0.12); }
+
+/* ================= 2. 全螢幕玻璃面板 ================= */
+.profile-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+    background-color: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+.profile-overlay.active {
+    display: flex;
+    animation: profileFadeIn 0.25s ease;
+}
+
+@keyframes profileFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.profile-panel {
+    position: relative;
+    width: 100%;
+    /* 預設機型 iPhone 16 Pro Max：440 × 956 CSS px（DPR 3），
+       與 styles/main.css 嘅 .phone-mockup 保持同一尺寸 */
+    max-width: 440px;
+    height: 100%;
+    max-height: 956px;
+    border-radius: 44px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    /* 先給實色底（#1C1C1E），再用半透明玻璃底覆蓋；
+       這樣即使 backdrop-filter 不支援，內容字色依然清晰可讀 */
+    background-color: #1C1C1E;
+    background-color: rgba(28, 28, 30, 0.86);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    backdrop-filter: blur(36px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    animation: profilePanelIn 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+    isolation: isolate;
+    color: var(--text-main);
+}
+
+@keyframes profilePanelIn {
+    from { opacity: 0; transform: scale(0.94) translateY(24px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+:root[data-theme="light"] .profile-panel {
+    background-color: rgba(246, 246, 250, 0.8);
+    border-color: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* 極光光斑：液態玻璃層次 */
+.profile-aurora {
+    position: absolute;
+    inset: -20%;
+    z-index: 0;
+    pointer-events: none;
+    filter: blur(52px);
+    opacity: 0.55;
+}
+
+.profile-aurora span {
+    position: absolute;
+    display: block;
+    border-radius: 50%;
+    animation: profileFloat 16s ease-in-out infinite;
+}
+
+.profile-aurora span:nth-child(1) {
+    width: 240px; height: 240px; top: -40px; left: -60px;
+    background: radial-gradient(circle, rgba(106, 92, 255, 0.85), transparent 70%);
+}
+
+.profile-aurora span:nth-child(2) {
+    width: 220px; height: 220px; top: 120px; right: -70px;
+    background: radial-gradient(circle, rgba(255, 95, 158, 0.8), transparent 70%);
+    animation-duration: 19s;
+    animation-direction: reverse;
+}
+
+.profile-aurora span:nth-child(3) {
+    width: 260px; height: 260px; bottom: -80px; left: 10%;
+    background: radial-gradient(circle, rgba(0, 212, 255, 0.75), transparent 70%);
+    animation-duration: 22s;
+}
+
+:root[data-theme="light"] .profile-aurora { opacity: 0.4; }
+
+@keyframes profileFloat {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(24px, -28px, 0) scale(1.12); }
+}
+
+/* ================= 3. 頂部列 + 捲動區 ================= */
+/* iOS 導覽列：整條 bar 高 56px，32px 嘅圓掣交由 align-items: center 居中
+   （即掣嘅上下各 12px 留白，左右 16px）。
+   ⚠ 點解唔寫「height: 44px + 上下 padding」：呢個檔案冇全域
+     box-sizing: border-box，.profile-topbar 係 content-box —— 44px 再加 padding
+     會變 68px；反過來若果有 border-box，44px 減去上下內距就只剩 32px 以下，
+     兩粒 32px 圓掣即刻爆出嚟。所以用「明確 height + 上下 padding: 0」，
+     兩種 box model 算出嚟都係 56px，唔會隨環境飄。
+   ⚠ 高度必須寫死：返回（‹）／⋯／× 三個掣係由 profileShowView() 輪流顯示嘅，
+     若果高度靠內容撐，切換視圖時條 bar 就會一高一低，標題上下跳。
+   ⚠ 瀏海安全區由 .profile-panel 統一負責（見檔案末端 @media：
+     padding-top: env(safe-area-inset-top) + 10px），呢度再加就會頂兩層。 */
+.profile-topbar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 56px;
+    padding: 0 16px;
+    flex-shrink: 0;
+    /* iOS 18 Liquid Glass 導覽列：半透明底 + 毛玻璃 + 0.5px Hairline。
+       同卡片共用同一組 --lg-* 數值，所以 bar 同卡一定係同一種玻璃。 */
+    background-color: var(--lg-nav-bg);
+    -webkit-backdrop-filter: var(--lg-blur);
+    backdrop-filter: var(--lg-blur);
+    border-bottom: 0.5px solid var(--lg-line);
+}
+
+/* 標題絕對居中於整條導覽列 —— 唔可以靠 flex 分配，原因：
+   ⚠ 舊版用 justify-content: space-between 排位，但三個掣係輪流顯示嘅 ——
+     子頁面只有「‹ 返回」（⋯ 冇動作時隱藏、× 喺子頁面讓位畀 ⋯），剩兩個 flex item
+     就會被推到左右兩端，標題直接貼去最右邊（用戶回報嘅正是此問題）。
+     改成絕對定位後，無論檯面上有一個、兩個抑或三個掣，標題永遠喺正中央。
+   ⚠ left: 50% 係相對 .profile-topbar 嘅 padding box（= 整個面板闊度），
+     即係對「面板中線」置中，而唔係對「兩粒掣之間」置中，同 iOS 一致。
+   ⚠ max-width 要扣去左右各「16px 內距 + 32px 圓掣」再留餘裕：
+     長標題（例如「儲存空間及數據」）只會自己出省略號，絕對唔會疊住粒掣。
+   ⚠ pointer-events: none：標題只係文字，唔應該攔截到下面粒掣嘅點擊。 */
+.profile-topbar__title {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: calc(100% - 104px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-main);
+    letter-spacing: 0.3px;
+    opacity: 0.85;
+}
+
+/* 右側關閉掣（×）永遠貼右邊。
+   ⚠ 呢個係「標題改絕對定位」之後必須補嘅一步：標題脫離咗 flex flow，主頁／登入頁
+     就只剩低一粒「×」，而 space-between 對「單一 flex item」係推去最左邊 ——
+     個 × 會飛去左上角。用 margin-left: auto 由掣自己撐去右邊，比加一個
+     空 spacer 元素好：唔需要為咗排版而喺 DOM 塞無意義嘅節點。
+   ⚠ 舊版呢度仲有 #profile-more（次頁面嘅「⋯」）。次頁面已搬入 .sub-page
+     並有自己嘅導覽列（#subpage-more），呢條 bar 唔應該再有任何「⋯」。 */
+#profile-close {
+    margin-left: auto;
+}
+
+.profile-close,
+.profile-topbar__ghost {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 900;
+    font-family: var(--font-family);
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.12);
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.profile-close:hover,
+.profile-topbar__ghost:hover { background-color: rgba(255, 255, 255, 0.22); }
+
+.profile-close:active,
+.profile-topbar__ghost:active { transform: scale(0.9); }
+
+:root[data-theme="light"] .profile-close,
+:root[data-theme="light"] .profile-topbar__ghost { background-color: rgba(0, 0, 0, 0.07); }
+
+.profile-scroll {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 16px 28px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.profile-scroll::-webkit-scrollbar { display: none; }
+
+/* ⚠ 已刪除「次頁面內容加 16px margin-top」嘅補丁（舊版 #profile-view-account /
+   #profile-view-detail > .ios-home）。
+   舊版次頁面住喺 .profile-scroll 入面，要外加 margin 先唔會貼死條 bar
+   —— 呢個正正就係「浮在半空」嘅成因之一：同一格螢幕有兩套內距喺度互相補償。
+   本版次頁面有自己嘅 .sub-page__body（padding: 16px），內距只有一處，
+   所以呢條補丁要徹底刪除，唔可以留低（留低會變成 32px 雙重內距）。 */
+
+.profile-view { display: none; }
+
+/* 視圖顯示開關：
+   JS 加上的是 .is-on，這裡同時兼容舊的 .active，
+   兩個類名任何一個存在都會令視圖顯示（之前只寫 .active，
+   而 JS 只加 .is-on，結果 4 個視圖全部 display:none → 彈窗一片漆黑）。 */
+.profile-view.is-on,
+.profile-view.active {
+    display: block;
+    color: var(--text-main);
+    animation: profileViewIn 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes profileViewIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ================= 3-5. 全螢幕次頁面（Full-screen Sub-page） =================
+   ⚠ 呢一節修正嘅係「架構級」錯誤，唔止係外觀。
+     舊版次頁面（外觀 / 免責聲明 / 儲存空間及數據 …）根本唔係一個「頁面」，
+     佢哋只係 .profile-scroll 入面另一段內容，於是出現三個唔原生嘅症狀：
+       1) 浮在半空、四周留白 —— 內容同時被 .profile-scroll 嘅 16px 內距、
+          .ios-home 嘅 16px gap 同 margin-top 補丁三重重複推開；
+       2) 雙重灰底 —— 半透明玻璃面板（.profile-panel + 極光光斑）之上
+          再疊半透明卡片（.ios-card + backdrop-filter），
+          灰上加灰，同 iOS「實色頁面 + 實色卡片」係兩回事；
+       3) 冇 Push 轉場 —— 純 display 切換，冇 iOS 由右滑入嘅空間感。
+
+   本版改成真正嘅「螢幕中嘅螢幕」：
+     · .sub-page 係 100% 寬高嘅容器，鋪滿整個 App 螢幕
+       （真機上 = 100% × 100dvh），冇外框、冇陰影、冇四周留白；
+     · 由右滑入 translateX(100%) → 0，返回時原路滑出（標準 iOS Push）；
+     · 自己一條 44px Liquid Glass 導覽列（含 safe-area），標題絕對居中；
+     · 頁面底色用「半透明系統材質」（深 rgba(0,0,0,0.62) /
+       淺 rgba(242,242,247,0.62)），下面嘅極光可以透上來，
+       令 .ios-card 嘅 backdrop-filter 有真實嘢可以折射 ——
+       呢個就係 iOS 18 Liquid Glass 同 iOS 17 純白實色卡嘅分別。
+       ⚠ 舊版為咗清「雙重灰底」而把頁面同卡片一齊壓成實色，
+         結果連玻璃都一齊冇埋（退化做 Flat White Card），所以已還原。
+
+   ⚠ 定位策略（點解預設係 absolute 而唔係 fixed）：
+     「螢幕」嘅實際邊界就係 .profile-panel（桌面預覽 = 440×956 手機外框，
+     真機 = 成個 viewport）。用 absolute + inset: 0，兩種情況下都剛好鋪滿
+     「螢幕」，而且一定唔會飛出手機外框。
+     真機斷點（≤500px）再改成 position: fixed + 100vw × 100dvh，
+     同 iOS 原生完全一致 —— 見檔案末端 @media。 */
+.sub-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* 蓋過 .profile-topbar 同 .profile-scroll（兩者都係 z-index: 2）同極光層 */
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    /* 半透明系統材質（唔再係實色）。
+       ⚠ 玻璃卡嘅 backdrop-filter 係「折射背後已繪製嘅嘢」——
+         呢層留半透明，下面嘅極光光斑先至透得上嚟，
+         卡片頂部至會出現真實嘅彩色折射；全實色的話毛玻璃形同虛設。 */
+    background-color: var(--sub-page-bg);
+    /* 未推入時：整塊泊喺螢幕右邊外面。
+       ⚠ visibility 嘅 transition 要延遲到滑出動畫播完（0.36s）才轉 hidden，
+         否則未播完就已經消失，變成「閃一下」而唔係「滑走」；
+         .is-on 入面會反過來即刻轉 visible（延遲 0s）。 */
+    transform: translateX(100%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.36s;
+    will-change: transform;
+}
+
+.sub-page.is-on {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* 次頁面自己嘅捲動容器（取代 .profile-scroll）。
+   ⚠ 唔可以共用 .profile-scroll：佢頂部只有 4px 內距、
+     而且係為主頁大頭像區 / 登入表單而設，節奏完全唔同；
+     兩者共用就係舊版要加 margin-top 補丁嘅原因。 */
+.sub-page__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* 透明：底色一律由父層 .sub-page 提供（單一來源），
+       呢度再畫一次只會令半透明疊成兩層、透明度對唔上。 */
+    background-color: transparent;
+}
+
+.sub-page__body::-webkit-scrollbar { display: none; }
+
+/* ---------- 導覽列（iOS 18 Liquid Glass Navigation Bar） ----------
+   同卡片用同一組玻璃語言：半透明底 + blur(25px) saturate(190%) +
+   0.5px 超淡 Hairline，唔再係一條死實色 bar。 */
+.sub-page__nav {
+    flex-shrink: 0;
+    /* 瀏海／動態島安全區：整條 bar 向下讓開，內容列仍然係 44px。
+       ⚠ 用 padding-top 而唔係 margin：背景色要連安全區一齊填滿，
+         否則狀態欄位置會露出一條唔同色嘅邊。 */
+    padding-top: env(safe-area-inset-top, 0px);
+    background-color: var(--lg-nav-bg);
+    -webkit-backdrop-filter: var(--lg-blur);
+    backdrop-filter: var(--lg-blur);
+    /* 底部細線（Hairline）：0.5px、超淡半透明 */
+    border-bottom: 0.5px solid var(--lg-line);
+}
+
+/* 真正嘅 44px 內容列：‹ / 標題 / ⋯ 三粒喺呢一層排列；
+   標題用絕對定位居中，所以左右兩粒掣闊度唔同都唔會令標題走位。
+   ⚠ 左右內距由舊版 6px 改為 16px：左右兩粒掣而家係 36px 圓形，
+     圓形左緣要同下面嘅卡片左緣（.sub-page__body 嘅 16px 內距）睇齊，
+     呢個就係 iOS 版面嘅「同一條欄線」。兩邊內距一樣（16px），
+     所以絕對居中嘅標題唔會偏心，唔需要另外補償。 */
+.sub-page__nav-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 16px;
+}
+
+/* 左側返回鍵：iOS 圓形膠囊按鈕（36px 灰底圓形 ＋ 置中深色「‹」）。
+   ⚠ 已移除「‹ 個人中心」嘅文字標籤：導覽列中央本身就有頁面標題，
+     左邊再寫一次上一個畫面名係雙重標示；標籤一長（「已連結裝置」）
+     仲要同中央標題爭位。冇可見文字之後，「返去邊」一律交由 aria-label 講
+     （profileShowView() 照舊寫入「返回 + 上一頁標題」，讀屏器讀得到）。
+   ⚠ 尺寸三層分工，唔可以互相取代：
+     · 視覺圓形 = 36px（需求指定）；
+     · 觸控熱區 = 44×44（Apple HIG 下限），由 ::after 嘅 inset: -4px 撐出嚟 ——
+       唔可以用 padding / min-height 撐，兩者都會令圓形本身跟住變大；
+     · 圖示本體 18px，喺圓內光學置中。
+   ⚠ 顏色一律由變數決定，唔寫死 #EFEFF4：#EFEFF4 係淺色主題嘅灰，
+     疊落本 App 預設嘅深色玻璃導覽列會變成一粒刺眼白波。
+     --lg-nav-fill 兩個主題各一份（淺 #EFEFF4、深 rgba(255,255,255,0.12)）。
+   ⚠ 圖示色用 --text-main 而唔用 --ios-blue：圓形灰底上嘅藍箭頭對比度
+     只有約 4.3:1（貼近 AA 邊緣），而參考圖嘅箭頭本身亦係深色；
+     --text-main 淺色 = #1C1C1E、深色 = #fff，兩個主題都夠清晰。 */
+.back-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--lg-nav-fill);
+    color: var(--text-main);
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+/* 觸控熱區：圓形維持 36px，實際可撳範圍撐到 44×44。
+   ⚠ 用偽元素而唔用 padding／min-height：偽元素唔參與排版，
+     亦唔會被 .sub-page__nav-row 嘅 44px 高裁走。 */
+.back-btn::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+}
+
+/* 按壓反饋：底色加深一級 ＋ 輕微縮細，同 .profile-close:active 同一種按鈕語言。
+   ⚠ 唔用 opacity：圓形本身有灰底，整粒變淡會似 disabled 而唔似「按下」。 */
+.back-btn:active {
+    background-color: var(--lg-nav-fill-active);
+    transform: scale(0.92);
+}
+
+/* 箭頭：flex: 0 0 auto 令佢永遠唔會被壓扁（圓內已無文字，純粹保險） */
+.back-btn__icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+}
+
+/* 中間標題：絕對居中（同 .profile-topbar__title 同一套做法）
+   ⚠ max-width 由舊版 calc(100% - 220px)（要讓開「‹ + 上一頁標題」嗰 109px）
+     改為 calc(100% - 112px)：左右兩粒掣而家係劃一嘅 36px 圓形，
+     112 = 2 ×（16px 列內距 ＋ 36px 圓形 ＋ 4px 緩衝）。
+   ⚠ left: 50% 喺絕對定位下係相對 .sub-page__nav-row 嘅 padding box，
+     而兩邊內距一樣（16px），所以改內距唔會令標題偏離螢幕正中。
+   ⚠ 實際最長標題係「回報問題 / 意見反饋」約 154px，遠細於 375px 窄機嘅
+     上限（375 − 112 = 263px），所以日常標題（已連結裝置／儲存空間及數據／
+     關於我們）一律唔會被省略，真箇超長嘅只會自己出省略號，
+     絕對唔會疊住左右兩粒圓形掣。
+   ⚠ 標題由「純文字」改成 flex 容器（文字 ＋ 可選嘅 Beta 膠囊），
+     所以 overflow / text-overflow / white-space 三件套已經搬去
+     .sub-page__title-text：flex 容器上面寫 text-overflow 係冇效嘅
+     （ellipsis 只對「自己帶 overflow 嘅 block／inline 盒」生效），
+     留低只會令人以為標題會自己收窄。 */
+.sub-page__title {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: calc(100% - 112px);
+    /* ⚠ align-items: center 一定要跟埋一齊寫：文字（17px）同膠囊（11px）
+       係兩種字級、兩條行高，靠 baseline 對齊會令膠囊明顯偏低幾個 px，
+       睇落似「跌咗落去」而唔係同一行。 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: none;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--text-main);
+}
+
+/* 標題文字本體：真正負責省略號嗰一層。
+   ⚠ min-width: 0 係 flex 收縮嘅前提：flex item 預設 min-width: auto，
+     唔寫嘅話長標題會撐爆容器而唔會出省略號（膠囊就被推出 max-width 之外）。
+   ⚠ 三件套只可以喺呢度寫一次，兩處都寫就變成「兩層各自截一次」。 */
+.sub-page__title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 標題右側嘅 Beta 膠囊（文字由頁面自己宣告：PROFILE_DETAIL_PAGES[key].badge）。
+   ⚠ 字色用 var(--primary-color) 而唔係需求寫死嘅 #007AFF：
+     本 App 預設深色主題，#007AFF 疊喺近黑底對比只有約 3.7:1（低於 AA 4.5:1），
+     粒膠囊會睇得好辛苦；--primary-color 淺色主題就係需求嗰個 #007AFF，
+     深色主題係 #0A84FF（同一色相、提亮版），兩個主題都達標。
+   ⚠ 底色同理分兩個主題：淺色主題用需求原值 rgba(0, 122, 255, 0.12)；
+     深色主題略為加濃（0.18），否則淡藍底疊喺黑上面根本睇唔出有個膠囊。 */
+.beta-badge {
+    /* ⚠ display 一定要明寫（唔靠 inline 預設）：膠囊係 inline-flex 盒，
+       padding 才會真正撐開高度、亦唔會被行高嘅上下留白擠歪。 */
+    display: inline-flex;
+    align-items: center;
+    /* 標題被截時唔可以壓扁膠囊（有 flex-shrink 預設 1 就會縮到變形） */
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgba(10, 132, 255, 0.18);
+    color: var(--primary-color);
+}
+
+:root[data-theme="light"] .beta-badge {
+    background: rgba(0, 122, 255, 0.12);
+}
+
+/* ⚠ [hidden] 必須明寫：UA 樣式表嘅 [hidden] { display: none } 係作者樣式嘅
+   手下敗將，而上面已經寫咗 display: inline-flex —— 唔補呢一條，hidden
+   就會完全失效，變成每個子頁面嘅標題右側都掛住一個 Beta。 */
+.beta-badge[hidden] { display: none; }
+
+/* 右側「⋯」：同返回掣完全鏡像對稱 —— 一樣 36px 圓形、一樣灰底、
+   一樣 44×44 觸控熱區、一樣嘅按壓反饋。兩粒掣係同一個元件嘅左右版本，
+   改任何一邊都必須同時改另一邊（見 .back-btn 一段嘅尺寸說明）。
+   ⚠ display 一定要留 flex：profile.js 收埋／顯示係寫
+     el.style.display = 'flex' / 'none'，改成 inline-flex 就會出現
+     「收埋之後撳唔返出嚟」。
+   ⚠ margin-left: auto 保留做保險：標題係絕對定位（唔佔 flex 位），
+     理論上 space-between 已經分開兩粒掣，但將來中間一插入節點就會走位。
+   ⚠ 冇選項嘅頁面由 profile.js 收埋（display: none），唔佔位。 */
+.sub-page__more {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--lg-nav-fill);
+    color: var(--text-main);
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+/* 觸控熱區：同 .back-btn::after 一樣，圓形維持 36px、可撳範圍 44×44 */
+.sub-page__more::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+}
+
+.sub-page__more:active {
+    background-color: var(--lg-nav-fill-active);
+    transform: scale(0.92);
+}
+
+/* ---------- 卡片：只服務「設定清單」（Toggle / Checkmark / 箭頭跳轉） ----------
+   ⚠ 呢度刻意「唔」再寫任何 .sub-page .ios-card 規則。
+     舊版曾經喺呢度把次頁面嘅卡片壓成「實色 + 零毛玻璃」（當時係為咗
+     清理雙重灰底），但副作用就係次頁面變成 iOS 17 嘅純白實色卡 ——
+     全站最有質感嘅一層反而冇咗玻璃。
+     而家卡片玻璃統一由上面 5-1 嘅單一 .ios-card 規則提供（--lg-card-bg
+     ＋ --lg-blur ＋ --lg-card-border），深淺色一律由 CSS 變數決定，
+     所以呢度唔需要、亦唔應該再有任何主題／頁面變體。
+   ⚠ 長文章（免責聲明等）唔屬於設定清單，嚴禁包成卡片 —— 見下面 .detail-doc。 */
+
+/* 次頁面嘅視圖切換唔再需要 translateY 淡入：
+   空間感一律由 .sub-page 嘅滑入動畫負責，兩者一齊播會變成「飄入 + 滑入」雙重動畫。 */
+.sub-page .profile-view.is-on,
+.sub-page .profile-view.active { animation: none; }
+
+/* 尊重系統「減少動態效果」：直接切換，唔播 Push 動畫 */
+@media (prefers-reduced-motion: reduce) {
+    .sub-page,
+    .sub-page.is-on { transition: none; }
+}
+
+/* ================= 4. 未登入：Auth 表單 ================= */
+.auth-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 14px 4px 22px;
+}
+
+.auth-hero__badge {
+    width: 92px;
+    height: 92px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 42px;
+    margin-bottom: 16px;
+    color: #fff;
+    background: linear-gradient(140deg, #6a5cff, #ff5f9e 55%, #00d4ff);
+    box-shadow: 0 16px 40px rgba(106, 92, 255, 0.45);
+    animation: authBadge 5s ease-in-out infinite;
+}
+
+@keyframes authBadge {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-6px) rotate(-3deg); }
+}
+
+.auth-hero__title {
+    font-size: 21px;
+    font-weight: 900;
+    color: var(--text-main);
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+}
+
+.auth-hero__desc {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 262px;
+}
+
+/* 玻璃小卡（Auth 表單 / 帳號清單共用） */
+.glass-card {
+    border-radius: 22px;
+    padding: 16px;
+    margin-bottom: 12px;
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="light"] .glass-card {
+    background-color: rgba(255, 255, 255, 0.74);
+    border-color: rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.auth-field { margin-bottom: 14px; }
+.auth-field:last-child { margin-bottom: 0; }
+
+.auth-field__label {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 7px;
+}
+
+.auth-input {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(0, 0, 0, 0.22);
+    color: var(--text-main);
+    font-family: var(--font-family);
+    font-size: 15px;
+    font-weight: 700;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-input::placeholder { color: var(--text-muted); font-weight: 600; }
+
+.auth-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25);
+}
+
+:root[data-theme="light"] .auth-input {
+    background-color: rgba(255, 255, 255, 0.92);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* 頭像上傳 */
+.auth-upload { display: flex; align-items: center; gap: 14px; }
+
+.auth-upload__preview {
+    position: relative;
+    width: 66px;
+    height: 66px;
+    flex: 0 0 66px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.auth-upload__preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.auth-upload__side { flex: 1; min-width: 0; }
+
+.auth-upload__title {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin-bottom: 3px;
+}
+
+.auth-upload__desc {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 9px;
+    line-height: 1.4;
+}
+
+.auth-upload__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.btn-mini {
+    padding: 8px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-family: var(--font-family);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    background-color: rgba(255, 255, 255, 0.16);
+    color: var(--text-main);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    outline: none;
+}
+
+.btn-mini:hover { background-color: rgba(255, 255, 255, 0.26); }
+.btn-mini:active { transform: scale(0.94); }
+
+:root[data-theme="light"] .btn-mini { background-color: rgba(0, 0, 0, 0.06); border-color: rgba(0, 0, 0, 0.06); }
+:root[data-theme="light"] .btn-mini:hover { background-color: rgba(0, 0, 0, 0.13); }
+
+.btn-primary-block {
+    width: 100%;
+    padding: 16px;
+    border-radius: 18px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 16px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #6a5cff, #a45cff 45%, #ff5f9e);
+    box-shadow: 0 14px 34px rgba(106, 92, 255, 0.42);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+    margin-top: 4px;
+}
+
+.btn-primary-block:hover { box-shadow: 0 18px 44px rgba(106, 92, 255, 0.55); }
+.btn-primary-block:active { transform: scale(0.97); }
+
+.btn-ghost-block,
+.btn-danger-block {
+    width: 100%;
+    padding: 15px;
+    border-radius: 18px;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 15px;
+    font-weight: 800;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    outline: none;
+}
+
+.btn-ghost-block {
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn-ghost-block:hover { background-color: rgba(255, 255, 255, 0.2); }
+.btn-ghost-block:active { transform: scale(0.97); }
+
+:root[data-theme="light"] .btn-ghost-block {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.07);
+}
+
+.btn-danger-block {
+    color: #fff;
+    background-color: rgba(255, 59, 48, 0.9);
+    border: none;
+}
+
+.btn-danger-block:hover { background-color: #ff3b30; }
+.btn-danger-block:active { transform: scale(0.97); }
+
+.auth-footnote {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    line-height: 1.6;
+    padding: 6px 12px 0;
+}
+
+/* ================= 5. 已登入：iOS 18 分組卡片個人主頁 ================= */
+
+/* 版面容器：卡片之間 16px 外距，形成清晰分界 */
+.ios-home {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 5-1 分組卡片：iOS 18 Liquid Glass 毛玻璃 + 標準大圓角（20px）
+   ⚠ 全站唯一一張卡片樣式，主頁同次頁面共用 —— 唔准再寫 .sub-page .ios-card
+     之類嘅「實色變體」：一有變體，兩邊就會各自演化成兩套玻璃。
+   ⚠ 四件套缺一不可：
+     ① background 半透明（--lg-card-bg）—— 玻璃要有穿透感；
+     ② backdrop-filter blur(25px) saturate(190%)（--lg-blur）—— 毛玻璃 + 高飽和；
+     ③ border 1px 玻璃折射邊框（--lg-card-border）—— 玻璃邊緣嘅光；
+     ④ box-shadow 超輕柔光影（--lg-card-shadow）—— 浮起但唔搶眼。
+   深淺兩色一律由 CSS 變數決定，所以呢度只需要一條規則。 */
+.ios-card {
+    position: relative;
+    border-radius: 20px;
+    padding: 0 14px;
+    overflow: hidden;
+    background-color: var(--lg-card-bg);
+    border: 1px solid var(--lg-card-border);
+    box-shadow: var(--lg-card-shadow);
+    -webkit-backdrop-filter: var(--lg-blur);
+    backdrop-filter: var(--lg-blur);
+}
+
+/* ⚠ .ios-card--bare（頭像區專用嘅「唔繪卡片」容器）已經移除。
+   新 Header 直接以 .wa-head 排列，唔再係卡片，故此呢個例外類別再冇用途；
+   留低只會引誘人再造「卡片裡面包卡片」。
+   （同 .ios-card__title 一樣保留呢段註解，防止日後有人「好心」再加返。）
+*/
+
+/* 卡片分類小標題（.ios-card__title）已經完全移除。
+   ⚠ 保留呢段註解係為咗防止日後有人「好心」再加返：
+     卡片之間只靠圓角 + .ios-home 嘅 16px 外距區隔，
+     卡片內部只有選單項目，維持 WhatsApp / iOS 18 嘅極簡分組風格。 */
+
+/* 5-3 分組小標題（.ios-group-title）：放喺「卡片外面」嘅灰色小字，
+   例如帳戶次頁面嘅「登入和安全」「你的帳戶」。
+   ⚠ 同上面 .ios-card__title 唔同性質，唔好混為一談：
+     .ios-card__title 係「卡片裡面再開一個小標題」（會令卡片一分為二），
+     呢個係 iOS 分組列表本身嘅 Section Header，卡片以外嘅純文字，
+     所以完全符合上面「卡片內部只有選單項目」嘅原則。
+   ⚠ 負 margin 係用嚟抵消 .ios-home 嘅 16px gap：
+     標題與上一張卡片 10px、與下一張卡片 6px，先似 iOS 原生間距；
+     唔抵消就會變成上下各 16px，個標題會孤零零浮喺中間。 */
+.ios-group-title {
+    margin: -6px 4px -10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+/* 子頁面表單卡：卡片本身只有左右 14px 內距（清單項目自帶 9px 上下內距），
+   但表單欄位冇，所以需要自己補上下留白，否則第一格會貼死卡片圓角邊。
+   ⚠ 唔用 .ios-card--form 之類嘅卡片修飾類：上面已經講明唔再加卡片變體。 */
+.detail-form {
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+
+/* ⚠ 原 .detail-note（卡片外嘅灰色說明段落）已刪除：
+   依指示介面唔再有任何解釋性小字，需要講嘅事一律變成卡片列（label + 值）。 */
+
+/* ⚠ 原本要喺呢度把 .sheet-row / .sheet-stat 嘅水平內距壓到 2px，
+   而家 .detail-row / .detail-stat 自己已經係 9px 2px（同 .ios-row 完全一致），
+   所以唔再需要覆寫規則 —— 少一條「靠後蓋前面」嘅規則，
+   日後改 .ios-row 內距時亦唔會出現兩套數值。 */
+
+/* 5-2 清單與項目
+   ⚠ 因為卡片頂部再冇小標題撐住，上下留白改由清單自己負責 ——
+     否則第一列同最後一列會貼死卡片圓角邊緣，睇落似被切斷。
+   ⚠ 主選單（#profile-view-home）嘅項目一律係「單行」：
+     灰色副標題（.ios-row__sub）已全部由 DOM 移除，每行只有一個主標題。
+     行高唔需要另外設定 —— .ios-row 本身已有 min-height 52px（≥ 44px 觸控目標）
+     同 align-items: center，單行時圖示、文字、右側 chevron 自然垂直居中，
+     高度穩定落喺 iOS 原生列表嘅 52px。 */
+.ios-list {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 0;
+}
+
+.ios-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    min-width: 0;
+    /* 觸控目標至少 44px（iOS Human Interface Guidelines） */
+    min-height: 52px;
+    padding: 9px 2px;
+    margin: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-family);
+    text-align: left;
+    color: var(--text-main);
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.18s ease;
+}
+
+/* 分割線：卡片內嘅超淡半透明線（0.5px Hairline），最後一項不顯示。
+   ⚠ 統一由 --lg-line 提供（深色 = rgba(255,255,255,0.08)、
+     淺色 = rgba(0,0,0,0.08)），唔可以再喺呢度寫死任何 rgba，
+     否則深淺兩色又會各自漂移成兩種灰。 */
+.ios-row:not(:last-child) {
+    border-bottom: 0.5px solid var(--lg-line);
+}
+
+/* 按壓回饋：只改底色，唔縮放（iOS 列表項目慣例） */
+button.ios-row:active { background-color: var(--lg-row-active); }
+
+/* ---------- iOS 系統色票 ----------
+   ⚠ 呢組色票只服務「有意義的狀態色」，唔再服務圖示：
+     設定頁圖示已改為單色線條（見下方 .ios-row__icon），所以
+     indigo / orange / pink / purple / teal / gray 六色已隨彩色圖示底框一併刪除。
+     現時實際有人用嘅只有三色：
+       · --ios-blue  ：單選列選中標記（.ios-choice.is-on）、輸入框聚焦、主按鈕
+       · --ios-green ：開關開啟狀態（.ios-switch.is-on）
+       · --ios-red   ：危險操作（.detail-action--danger）
+     深色主題值放 :root（本 App 預設即深色），淺色由 [data-theme="light"] 覆寫。 */
+:root {
+    --ios-blue: #0a84ff;
+    --ios-green: #30d158;
+    --ios-red: #ff453a;
+
+    /* ---------- iOS 18 Liquid Glass 表面（卡片 / 導覽列 / 分割線） ----------
+       ⚠ 「玻璃」＝半透明底色 ＋ backdrop-filter 光學處理，唔係死實色。
+         iOS 17 嘅純白實色卡（Flat White Card）冇半透明、冇折射，
+         所以睇落同白紙一樣；iOS 18 嘅卡會透出並折射背後嘅極光同內容。
+       呢組數值就是全站唯一真相：卡片、導覽列、分割線一律由此取色，
+       唔准再有任何地方另寫一組 rgba（寫死就會出現兩套玻璃、兩種灰）。
+       ⚠ 深色係預設（本 App 嘅 :root 本身即深色主題），淺色由
+         [data-theme="light"] 覆寫 —— 唔需要另寫 .ios-card 嘅主題規則。 */
+    --lg-blur: blur(25px) saturate(190%);
+    /* 卡片玻璃：深色 = rgba(30,30,30,0.65)、淺色 = rgba(255,255,255,0.65) */
+    --lg-card-bg: rgba(30, 30, 30, 0.65);
+    /* 玻璃折射邊框：玻璃邊緣嘅一圈高光 */
+    --lg-card-border: rgba(255, 255, 255, 0.15);
+    /* 超輕柔光影 ＋ 頂部 1px 鏡面高光（玻璃表面嘅反光） */
+    --lg-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    /* 導覽列玻璃（比卡片再透少少，令內容捲過時見到折射） */
+    --lg-nav-bg: rgba(22, 22, 24, 0.62);
+    /* 卡片內部嘅超淡分割線（0.5px Hairline） */
+    --lg-line: rgba(255, 255, 255, 0.08);
+    /* 列表項目按壓回饋 */
+    --lg-row-active: rgba(255, 255, 255, 0.08);
+    /* 導覽列圓形按鈕（返回「‹」／更多「⋯」）嘅膠囊底色。
+       淺色用需求指定嘅 #EFEFF4（見下面 [data-theme="light"]）；
+       深色唔可以照用 —— #EFEFF4 疊喺深色玻璃導覽列上會變成一粒刺眼白波，
+       所以改用 rgba(255,255,255,0.12)，同 .profile-close 嘅灰完全一樣。 */
+    --lg-nav-fill: rgba(255, 255, 255, 0.12);
+    --lg-nav-fill-active: rgba(255, 255, 255, 0.22);
+
+    /* 次頁面「螢幕」底色：半透明系統材質，而唔係實色 #000 / #F2F2F7。
+       ⚠ 呢個係毛玻璃能唔能夠成立嘅關鍵：玻璃卡嘅 backdrop-filter 要有
+         背後嘅嘢才可以折射（極光光斑）。頁面若果係 100% 實色，
+         毛玻璃等於冇效果，睇落同 iOS 17 純白實色卡完全一樣。 */
+    --sub-page-bg: rgba(0, 0, 0, 0.62);
+}
+
+:root[data-theme="light"] {
+    --ios-blue: #007aff;
+    --ios-green: #34c759;
+    --ios-red: #ff3b30;
+
+    /* 淺色玻璃：半透明白卡 ＋ 白色折射邊框（iOS 18 淺色模式嘅標準數值） */
+    --lg-card-bg: rgba(255, 255, 255, 0.65);
+    --lg-card-border: rgba(255, 255, 255, 0.5);
+    --lg-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    --lg-nav-bg: rgba(255, 255, 255, 0.62);
+    --lg-line: rgba(0, 0, 0, 0.08);
+    --lg-row-active: rgba(0, 0, 0, 0.04);
+    /* 圓形按鈕：需求指定嘅 #EFEFF4（iOS systemGray6）＋ 按下加深一級。
+       呢個值同玻璃導覽列疊出嚟約等於 rgba(0,0,0,0.07) 嘅效果，
+       但需求要嘅係「實色灰階底色」，所以照用原本嘅 #EFEFF4。 */
+    --lg-nav-fill: #EFEFF4;
+    --lg-nav-fill-active: #E2E2E8;
+    --sub-page-bg: rgba(242, 242, 247, 0.62);
+}
+
+/* ---------- 左側圖示欄（WhatsApp 原生單色線條風格） ----------
+   ⚠ 依設計要求：徹底移除 iOS 系統設定風格嘅「彩色圓形／圓角底框」。
+     底色永遠透明、無邊框、無內高光，亦唔再逐項配色 ——
+     純粹一條線條圖示，顏色由 icons.js 嘅 stroke: currentColor 話事
+     （所以呢度只需要設定 color）。
+     尺寸：欄寬固定 24px、圖示本體 22px，左側對齊並靠 .ios-row 嘅 gap 與文字分隔。 */
+.ios-row__icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* ⚠ 固定尺寸容器內唔應該有任何內距 —— 居中完全交俾 flex 處理。
+       加 padding 只會壓縮可用空間並令圖示偏移，呢個正正係之前「圖示唔置中」嘅主因。 */
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    /* 任何「彩色底框」殘留都必須清零：透明底、無邊框、無圓角、無高光 */
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    /* 單色線條：深色主題（本 App 預設）為純白 */
+    color: #ffffff;
+    /* 消除 inline-level 殘留嘅行高，避免圖示被基線推歪 */
+    line-height: 0;
+    font-size: 0;
+}
+
+/* 淺色主題：近黑（#1C1C1E 為 iOS label 色，比純黑柔和少少，長時間睇更舒服） */
+:root[data-theme="light"] .ios-row__icon {
+    color: #1c1c1e;
+}
+
+/* 圖示必須絕對居中（上下左右空隙相等）：
+   icons.css 嘅 .app-icon 帶有 vertical-align: -0.16em（為 inline 文字並排而設），
+   就算放喺 flex 容器，baseline 對齊仍會令圖示偏移 1~2px。
+   呢度明確清零；選擇器特異性高於 icons.css，唔靠樣式表載入順序取勝。 */
+.ios-row .ios-row__icon .app-icon,
+.ios-row .ios-row__icon svg {
+    display: block;
+    margin: 0;
+    padding: 0;
+    vertical-align: 0;
+    flex: 0 0 auto;
+    line-height: 0;
+    /* 圖示本體尺寸；與 HTML 嘅 data-icon-size="22" 一致，呢度只係保險。 */
+    width: 22px;
+    height: 22px;
+}
+
+/* 圖示配色修飾類（.ios-row__icon--blue / --green / --indigo …）已連同彩色底框一併刪除。
+   ⚠ 保留呢段註解係為咗防止日後有人「好心」再加返：
+     設定頁只可以有單色線條圖示，任何彩色底框都會破壞 WhatsApp 極簡風格。 */
+
+.ios-row__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ios-row__body--center { align-items: center; }
+
+.ios-row__label {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 副標題：主選單已完全停用（見上方 5-2 說明），
+   目前只剩「值本身」在用（帳戶次頁面嘅電郵地址 / 用戶名稱、已連結裝置嘅裝置名）。
+   ⚠ 呢個類別唔可以再放「解釋性小字」（例如「本版本只在本機保存登入狀態」）：
+     需要講嘅事一律變成下面 .ios-row__value 嘅右側數值，一行一項。 */
+.ios-row__sub {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 唯讀資訊列嘅右側數值（例：驗證狀態 → 無需驗證）。
+   ⚠ 舊版係「標題下面一行灰色小字」（.ios-row__sub），令每行都兩行高、
+     畫面雜亂；依「介面不留解釋性小字」嘅指示改成 iOS 原生嘅右對齊數值，
+     同 .detail-stat 同一套語言：左邊項目名、右邊數值、永遠單行。
+   overflow 處理跟 .detail-stat__v 同一原則：數值唔可以撐爆卡片。 */
+.ios-row__value {
+    flex: 0 0 auto;
+    margin-left: auto;
+    max-width: 62%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+/* 右側 Chevron 箭頭：純 CSS 繪製，唔需要額外圖示檔 */
+.ios-row__chevron {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    margin-left: 2px;
+    border-right: 1.6px solid var(--text-muted);
+    border-bottom: 1.6px solid var(--text-muted);
+    /* 旋轉 -45° 令「┘」角落轉成 › 形 */
+    transform: rotate(-45deg);
+    opacity: 0.55;
+}
+
+/* 登出：依 iOS 慣例，紅字、置中、無圖示、無箭頭。
+   ⚠ 顏色依指示統一為 iOS 原生警告紅 #ff3b30 —— 深色主題原本用 #ff453a，
+     已一併改掉；兩個主題現在同一個紅，唔會再出現兩種唔同嘅紅。
+   ⚠ 「置中」由 DOM 嘅 .ios-row__body--center 負責（見 index.html 主頁帳戶卡、
+     以及「帳戶」次頁面最底嘅獨立登出卡），呢條規則只負責顏色 ——
+     因為 profile.js 嘅 profileNavRowHtml(..., danger) 亦會產生紅字列。 */
+.ios-row.is-danger .ios-row__label {
+    color: #ff3b30;
+    font-weight: 700;
+}
+
+/* 淺色主題：同一個 #ff3b30（保留獨立規則係為咗日後若要分開微調時有落腳位）。 */
+:root[data-theme="light"] .ios-row.is-danger .ios-row__label {
+    color: #ff3b30;
+}
+
+/* ---------- 單選列（外觀子頁面：淺色 / 深色 / 跟隨系統） ----------
+   整列可撳，右側圓形剔號只有選中時才亮起 —— 唔用開關掣，
+   因為三個選項互斥，開關掣會令人誤以為可以各自獨立開關。
+   ⚠ 尺寸必須同 .ios-row 完全一致（min-height 52px、padding 9px 2px、字級 14px、
+     分割線同色），否則佢會喺同一張卡片入面比隔離嘅行矮一截，
+     一睇就知唔係原生列表。行內亦只有一行文字：唔設 __desc，
+     原生單選清單唔會有解釋小字（見 profile.js 嘅 profileDetailAppearanceHtml）。 */
+.ios-choice {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    min-width: 0;
+    min-height: 52px;
+    padding: 9px 2px;
+    margin: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-family);
+    text-align: left;
+    color: var(--text-main);
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.18s ease;
+}
+
+/* 分割線：同 .ios-row 完全一致（同一個 --lg-line），最後一項不顯示 */
+.ios-choice:not(:last-child) { border-bottom: 0.5px solid var(--lg-line); }
+
+/* 按壓回饋：同 .ios-row 一致（只改底色，唔縮放） */
+.ios-choice:active { background-color: rgba(255, 255, 255, 0.06); }
+:root[data-theme="light"] .ios-choice:active { background-color: rgba(0, 0, 0, 0.04); }
+
+.ios-choice__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 右側圓形剔號：未選中係灰底、剔號透明（佔位但唔顯示，避免文字左右跳動）；
+   選中先變 iOS 藍底白剔。 */
+.ios-choice__mark {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: #fff;
+    background-color: rgba(120, 120, 128, 0.22);
+}
+
+.ios-choice__mark svg { opacity: 0; transition: opacity 0.16s ease; }
+
+.ios-choice.is-on .ios-choice__mark { background-color: var(--ios-blue); }
+.ios-choice.is-on .ios-choice__mark svg { opacity: 1; }
+
+/* ============================================================
+   5-1 Header：WhatsApp 設定頁風格身份區（垂直居中）
+   ────────────────────────────────────────────────────────────
+   舊版係「左頭像 + 右文字」橫向卡片（.profile-hero / .glow-avatar，
+   外加彩虹流光光圈同綠色狀態點）。本版 1:1 還原 WhatsApp 設定頁：
+     頂部工具列（左＝搜尋圓掣／右＝編輯圓掣，QR 已移除）
+     ⚠ 主選單每一行只有主標題，灰色副標題已全部移除（單行 52px）
+     → 狀態氣泡 → 大圓頭像 → 顯示名稱（＋向下箭頭）→ @handle
+   ⚠ 整區唔再有卡片框、邊框或彩虹光圈，背景完全透明，
+     靠 .ios-home 嘅 16px 外距同下方卡片區隔。
+   ============================================================ */
+
+.wa-head {
+    /* 兩個表面色：工具列／膠囊 與 狀態氣泡。
+       深色主題用半透明白做出層次；淺色主題直接白，
+       跟 WhatsApp 淺色設定頁一樣以「白 + 柔和陰影」浮起。 */
+    --wa-surface: rgba(255, 255, 255, 0.1);
+    --wa-bubble: rgba(255, 255, 255, 0.14);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 0 6px;
+}
+
+:root[data-theme="light"] .wa-head {
+    --wa-surface: #ffffff;
+    --wa-bubble: #ffffff;
+}
+
+/* ---------- 頂部工具列 ---------- */
+
+.wa-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+}
+
+.wa-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--wa-surface);
+    color: var(--text-main);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.16s ease;
+}
+
+/* ⚠ 已刪除 .wa-iconbtn-group（QR ＋ 編輯共用嘅右側膠囊）：
+   QR Code 功能全面取消後，右側只剩一顆編輯圓掣，
+   直接用 .wa-iconbtn 嘅 42px 圓形底色，與左側搜尋掣完全對稱。 */
+
+.wa-iconbtn:active { transform: scale(0.92); }
+
+/* 搜尋展開中：掣本身轉為強調色，明確表示「已經開咗」 */
+.wa-iconbtn.is-on { color: var(--ios-blue); }
+
+/* ---------- 設定搜尋列 ---------- */
+
+.wa-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 40px;
+    margin-top: 10px;
+    padding: 0 12px;
+    border-radius: 12px;
+    background-color: var(--wa-surface);
+    box-sizing: border-box;
+}
+
+/* [hidden] 必須贏過上面嘅 display:flex，否則收起唔到 */
+.wa-search[hidden] { display: none; }
+
+.wa-search__icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
+.wa-search__input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font-family: var(--font-family);
+    font-size: 15px;
+    color: var(--text-main);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.wa-search__input::placeholder { color: var(--text-muted); }
+
+/* 收起 type="search" 自帶嘅原生清除叉，統一由 .wa-search__clear 負責 */
+.wa-search__input::-webkit-search-cancel-button,
+.wa-search__input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    display: none;
+}
+
+.wa-search__clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.wa-search__clear:active { transform: scale(0.9); }
+
+/* 搜尋冇結果：置中低調灰字，唔搶過上面嘅清單 */
+.wa-search-empty {
+    margin: 14px 4px 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.wa-search-empty[hidden] { display: none; }
+
+/* ---------- 狀態氣泡 + 大圓頭像 ---------- */
+
+.wa-avatar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.wa-status {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 82%;
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 19px;
+    background-color: var(--wa-bubble);
+    color: var(--text-main);
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+    box-sizing: border-box;
+}
+
+/* WhatsApp 式氣泡尾巴：左下角探出一個同色小圓 */
+.wa-status::after {
+    content: '';
+    position: absolute;
+    left: 26px;
+    bottom: -3px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background-color: var(--wa-bubble);
+}
+
+.wa-status__icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
+.wa-status__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wa-avatar__img {
+    display: block;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--bg-secondary);
+    /* 用極淡嘅描邊代替實線光圈，保持原生觀感 */
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+/* ---------- 顯示名稱 + 向下箭頭 ---------- */
+
+.wa-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin-top: 16px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 14px;
+    background: none;
+    color: var(--text-main);
+    font-family: var(--font-family);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.wa-name__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wa-name__caret {
+    display: inline-flex;
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
+/* 撳落去嘅回饋：呢行係「切換帳號」入口，唔加背景色以免搶焦點 */
+.wa-name:active { opacity: 0.6; }
+
+/* ---------- @handle ---------- */
+
+.wa-handle {
+    margin: 4px 0 0;
+    max-width: 100%;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-pill {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 5px 10px;
+    border-radius: 10px;
+    color: var(--text-main);
+    background-color: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+}
+
+:root[data-theme="light"] .tag-pill {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.04);
+}
+
+.tag-pill--live {
+    color: #fff;
+    background: linear-gradient(120deg, rgba(52, 199, 89, 0.95), rgba(0, 212, 255, 0.95));
+    border-color: transparent;
+}
+
+/* 雲端同步狀態標籤（Supabase）：點擊即手動同步一次 */
+.tag-pill--cloud {
+    color: #fff;
+    border-color: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    background: linear-gradient(120deg, rgba(106, 92, 255, 0.95), rgba(0, 212, 255, 0.95));
+    transition: transform 0.12s ease, opacity 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.tag-pill--cloud:active { transform: scale(0.96); }
+
+/* 已同步：沿用「成功」綠色系，同「使用中」標籤一致 */
+.tag-pill--cloud.is-synced {
+    background: linear-gradient(120deg, rgba(52, 199, 89, 0.95), rgba(0, 212, 255, 0.95));
+}
+
+/* 同步中：柔和呼吸，提示用戶「稍等一下」但唔阻擋操作 */
+.tag-pill--cloud.is-syncing {
+    animation: cloudPillPulse 1.4s ease-in-out infinite;
+}
+
+/* 待同步：琥珀色，明顯但唔刺眼 */
+.tag-pill--cloud.is-pending {
+    background: linear-gradient(120deg, rgba(255, 159, 10, 0.95), rgba(255, 94, 158, 0.95));
+}
+
+/* 離線：低調灰，避免用戶以為壞咗 */
+.tag-pill--cloud.is-offline {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+:root[data-theme="light"] .tag-pill--cloud.is-offline {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+.tag-pill--cloud.is-error {
+    background: linear-gradient(120deg, rgba(255, 69, 58, 0.95), rgba(255, 94, 158, 0.95));
+}
+
+@keyframes cloudPillPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.62; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tag-pill--cloud.is-syncing { animation: none; }
+}
+
+/* 5-4 專案展示牆：已移除。
+   原本 4 個 .wall-tile 快捷入口（週覽總表／課表檢視／月曆行程／假期倒數）
+   與底部 TabBar 完全重複 —— 兩者都只係切換到同一個 page-*，
+   現由「核心功能」卡片的清單項目取代，相關樣式一併刪除。 */
+
+/* 5-5 頁尾（Footer）：版本號放在設定頁最底部，低調、不可互動。 */
+.profile-footer {
+    padding: 22px 8px 10px;
+    text-align: center;
+}
+
+.profile-footer__note {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+}
+
+.profile-footer__version {
+    margin: 6px 0 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    /* 比上面嘅說明文字再淡一級，做到「低調但可讀」 */
+    opacity: 0.75;
+    /* 純顯示、不可點、不可選中 —— 呢個元素唔再帶任何隱藏功能 */
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ================= 5-6 子頁面共用元件（Sub-page Components） =================
+   ⚠ 通用模態抽屜（.ios-sheet / #ios-sheet-overlay，連拖曳條與右上 ❌）已徹底刪除：
+     個人中心所有內容一律走 #profile-view-detail 嘅標準 Push 次頁面。
+     理由：同一層設定同時存在「彈窗」同「推入」兩套導覽語言，
+     會令用戶唔知撳返回鍵會去邊，而且彈窗會蓋住整個畫面（違反 iOS 設定頁慣例）。
+   以下元件全部服務子頁面：操作列、統計列、開關列、表單、FAQ、
+   法律條文、邀請連結與強調卡。 */
+
+/* ---------- 操作列（卡片內嘅藍／紅字動作，例如「儲存」「清除快取」） ----------
+   ⚠ 依 iOS 設定頁慣例：動作本身就係清單其中一列，同一張卡、同一條左邊線。
+     唔用整塊藍色大按鈕 —— 嗰種樣式同「卡片 + 列」嘅清單語言唔一致，
+     亦係上一版「按鈕浮喺卡片之外／數字被切斷」嘅同源問題。 */
+.detail-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 9px 2px;
+    margin: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: var(--font-family);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.1px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--ios-blue);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.detail-action:active { opacity: 0.55; }
+.detail-action:disabled { opacity: 0.45; cursor: default; }
+
+/* 破壞性動作（清除快取 / 登出）：iOS 原生警告紅 #ff3b30 */
+.detail-action--danger { color: var(--ios-red); }
+
+/* 同一張卡有兩列以上動作時（例如邀請頁「系統分享 / 複製連結」）要有分隔線，
+   同 .ios-row 一致；最後一列唔加線，否則卡片底部會多出一條。 */
+.detail-action:not(:last-child) { border-bottom: 0.5px solid var(--lg-line); }
+
+/* ⚠ 原 .sheet-lead / .sheet-note（彈窗頂部同底部嘅灰色解釋小字）已刪除：
+   依指示介面唔再有任何解釋性段落 —— 標題 + 列 + 數值就講得完嘅事，
+   唔需要用一段灰字再講一次。同時刪除 .sheet-section-title（改用既有
+   .ios-group-title）同 .sheet-group（改用既有 .ios-card + .ios-list）。 */
+
+/* ---------- 開關列（私隱：標籤 + iOS 開關，直接放入 .ios-list） ---------- */
+.detail-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 9px 2px;
+}
+
+.detail-row__body { flex: 1 1 auto; min-width: 0; }
+
+.detail-row__label {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+    color: var(--text-main);
+}
+
+.detail-row__desc {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+/* ---------- 統計列（儲存空間及數據用） ----------
+   ⚠ 上一版數字會被卡片右邊切斷（截圖：2.24 MB / 380.90 GB 貼出咭邊）：
+     `.sheet-stat__v` 用 flex: 0 0 auto 唔可壓縮，而 `.sheet-stat__k`
+     冇 min-width: 0，長項目名會反過來把數值推出卡片外。
+   修正原則（iOS 設定頁做法）：
+     1. 數值最重要 → flex: 0 0 auto + nowrap，永遠完整顯示、靠右、灰色；
+     2. 項目名讓位 → flex: 0 1 auto + min-width: 0 + ellipsis 收尾；
+     3. 兩者都唔可以令列寬超出卡片（min-width: 0 斷開 flex 最小內容寬度）。 */
+.detail-stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 11px 2px;
+}
+
+.detail-stat:not(:last-child) { border-bottom: 0.5px solid var(--lg-line); }
+
+.detail-stat__k {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.detail-stat__v {
+    flex: 0 0 auto;
+    margin-left: auto;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-muted);
+    /* 數字等寬，令逐項數字對齊唔會跳動 */
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- iOS 開關 ---------- */
+.ios-switch {
+    position: relative;
+    flex: 0 0 51px;
+    width: 51px;
+    height: 31px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    background-color: rgba(120, 120, 128, 0.32);
+    transition: background-color 0.24s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ios-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    background-color: #fff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
+    transition: transform 0.24s cubic-bezier(0.3, 0.9, 0.4, 1);
+}
+
+.ios-switch.is-on { background-color: var(--ios-green); }
+
+/* 51 − (2 × 2) − 27 = 20px：剛好推到最右而唔會超出膠囊 */
+.ios-switch.is-on::after { transform: translateX(20px); }
+
+.ios-switch:disabled { opacity: 0.45; cursor: default; }
+
+/* ---------- 表單（子頁面內，輸入框一律住在 .ios-card 入面） ---------- */
+.detail-field { margin: 0 0 14px; }
+
+/* 卡片內最後一個欄位唔需要再撐出底部空隙 */
+.detail-field:last-child { margin-bottom: 0; }
+
+.detail-field__label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+}
+
+.detail-input,
+.detail-select,
+.detail-textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(120, 120, 128, 0.14);
+    color: var(--text-main);
+    font-family: var(--font-family);
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+:root[data-theme="light"] .detail-input,
+:root[data-theme="light"] .detail-select,
+:root[data-theme="light"] .detail-textarea {
+    border-color: rgba(0, 0, 0, 0.1);
+    background-color: rgba(120, 120, 128, 0.08);
+}
+
+.detail-input:focus,
+.detail-select:focus,
+.detail-textarea:focus { border-color: var(--ios-blue); }
+
+/* 唯讀／停用欄位：明確降低對比，令用戶一眼睇出唔改得 */
+.detail-input[readonly],
+.detail-input:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.detail-select {
+    /* 自繪下拉箭頭（原生外觀已被 appearance: none 移除） */
+    background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 19px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 40px;
+}
+
+.detail-textarea {
+    min-height: 110px;
+    resize: vertical;
+    line-height: 1.65;
+}
+
+/* ⚠ 原 .sheet-btn / --danger / --ghost / .sheet-btn-row（整塊填色大按鈕）已刪除：
+   動作一律改用上方 .detail-action / --danger 嘅「卡片內清單列」，
+   咁樣按鈕同卡片邊框、左邊線都對得齊，亦同 iOS 設定頁一致。 */
+
+/* ---------- FAQ 手風琴（用原生 <details>，唔需要 JS） ---------- */
+.detail-faq { display: flex; flex-direction: column; gap: 10px; }
+
+.detail-faq__item {
+    border-radius: 14px;
+    overflow: hidden;
+    background-color: rgba(120, 120, 128, 0.12);
+}
+
+:root[data-theme="light"] .detail-faq__item { background-color: rgba(120, 120, 128, 0.08); }
+
+.detail-faq__q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 14px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: -0.1px;
+    color: var(--text-main);
+}
+
+/* 移除 Safari / Chrome 預設嘅三角形標記 */
+.detail-faq__q::-webkit-details-marker { display: none; }
+.detail-faq__q::marker { content: ''; }
+
+.detail-faq__q::after {
+    content: '＋';
+    flex: 0 0 auto;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.detail-faq__item[open] .detail-faq__q::after { content: '－'; }
+
+.detail-faq__a {
+    padding: 0 14px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 1.75;
+    color: var(--text-muted);
+}
+
+/* ---------- 法律條文排版（長篇文字用） ----------
+   ⚠ 架構規則：長文章 / 條款（免責聲明、服務條款、私隱政策、條款與許可）
+     一律「文字直接渲染在頁面 Body 內」，嚴禁套用任何圓角卡片外框。
+     所以 .detail-doc 冇 background、冇 border、冇 border-radius、冇 padding
+     —— 左右 16px 內距一律由 .sub-page__body 提供（單一來源）。
+     圓角白卡只留畀設定清單（Toggle / Checkmark / 箭頭跳轉）。 */
+.detail-doc {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.78;
+    color: var(--text-main);
+}
+
+.detail-doc__meta {
+    margin: 0 0 16px;
+    padding-bottom: 12px;
+    border-bottom: 0.5px solid var(--lg-line);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+}
+
+.detail-doc h3 {
+    margin: 22px 0 9px;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: -0.2px;
+    color: var(--text-main);
+}
+
+.detail-doc h3:first-of-type { margin-top: 4px; }
+
+.detail-doc h4 {
+    margin: 15px 0 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-main);
+}
+
+.detail-doc p { margin: 0 0 11px; }
+
+.detail-doc ul,
+.detail-doc ol { margin: 0 0 11px; padding-left: 21px; }
+
+.detail-doc li { margin-bottom: 6px; }
+
+.detail-doc strong { font-weight: 800; color: var(--text-main); }
+
+/* 條款末段嘅「大寫條款 / 補充說明」。
+   ⚠ 舊版係一個圓角灰底卡（border-radius: 12px + rgba 底）—— 咁樣就係
+     「喺嚴禁卡片嘅長文章入面再塞一個卡」，同架構規則自相矛盾。
+     新版改成純文字段落 + 一條頂部分隔線：保留強調感，但唔再係卡。 */
+.detail-doc__caps {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 0.5px solid var(--lg-line);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.7;
+}
+
+/* ---------- 邀請連結（複製 / 系統分享用） ----------
+   ⚠ 呢個係「欄位」而唔係卡片：佢包住一條可以全選複製嘅網址，
+     所以保留圓角 + 內距，但底色改用同一組玻璃表面（--lg-card-bg），
+     唔可以另寫一隻灰 —— 一隻唔跟 --lg-* 嘅灰就係「浮空卡」嘅視覺來源。 */
+.detail-link {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 14px;
+    background-color: var(--lg-card-bg);
+}
+
+.detail-link__label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.detail-link__url {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.6;
+    color: var(--text-main);
+    /* 長連結必須可以斷行，否則會撐爆卡片寬度 */
+    word-break: break-all;
+    /* 支援嘅瀏覽器可以一撳全選，方便手動複製 */
+    user-select: all;
+}
+
+/* ---------- 子頁面置中提示（例如分享提示） ----------
+   ⚠ 舊版係一個圓角灰底「強調資訊卡」—— 但佢唔係設定清單（冇 Toggle、
+     冇 Checkmark、冇箭頭跳轉），依架構規則唔可以用圓角卡片包裹。
+     新版改成純置中文字區塊：無底、無框、無圓角，只保留留白同字級層級。 */
+.detail-callout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 8px 8px;
+    border-radius: 0;
+    text-align: center;
+    background: none;
+}
+
+.detail-callout__title {
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: -0.2px;
+    color: var(--text-main);
+}
+
+.detail-callout__desc {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+/* ---------- App 資訊區塊嘅版本號（「關於我們」頁頂部第三行） ----------
+   ⚠ 呢個 class 同下一段嘅 .detail-tribute（頁尾致敬標語）只係喺「呢個檔案」
+     入面相鄰，喺頁面上一個喺頂、一個喺底，兩者完全冇關係 ——
+     唔好因為睇落相鄰而合併，或者互相加 margin。
+   ⚠ 用 .detail-callout__version 而唔用 .ios-row__value（profileInfoRowHtml）：
+     版本號唔係清單項目（唔可撳、冇箭頭、冇分隔線），依架構規則唔可以用
+     .ios-card 包裹；而且佢同上面嘅 App 名稱／簡介係同一個「App 資訊」區塊，
+     抽出嚟做一張單列卡會令節奏斷開。
+   ⚠ 顏色一律用 --text-muted，唔可以硬編 #888888：
+     深色主題嘅 --text-muted 係 #94a3b8，硬編中灰喺深底上對比不足
+     （達唔到 AA），而且主題一切換就會同其他註腳唔一致。
+   ⚠ 唔加 opacity 壓淡（頁尾 .profile-footer__version 有用，但嗰度係 10px
+     純裝飾；呢度係要讀得到嘅版本資訊，壓淡會令對比進一步下降）。
+   ⚠ 用等寬字體係為咗數字逐位對齊，同 .profile-footer__version 一致 ——
+     用戶核對版本號時，兩處睇落應該係同一種字。
+   ⚠ margin-top: 2px 係刻意嘅：外層 .detail-callout 係 flex column ＋
+     gap: 6px，而 flex 嘅 gap 同子項 margin 係「相加」，所以實際距離上一行
+     8px —— 令版本號同「名稱／簡介」之間多一級呼吸位，睇落似區塊尾行而唔似
+     第三行正文。 */
+.detail-callout__version {
+    margin-top: 2px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+}
+
+/* ---------- 頁尾致敬標語（開發者大卡內嘅最後一項） ----------
+   ⚠ 呢三段（.detail-tribute / __icon / __text）曾經被刪過一次，呢次係按需求
+     恢復。以後再刪標語，記得連 icons.js 嘅 heart 一齊處理，反之亦然 ——
+     兩邊任何一邊單獨留低都會變死碼。
+   ⚠ 佢而家係開發者大卡「入面」嘅一行（見 profileDetailAboutHtml），
+     唔可以再自己畫卡片外框；同上一段內容之間嘅分隔線由
+     .dev-member + .detail-tribute 提供（見下面開發者區塊一段）。
+   ⚠ width: 100% 係必要嘅：父層 .dev-panel 係 align-items: center 嘅
+     flex column，唔寫就會 shrink-to-fit 貼住文字，橫線亦只會畫到文字咁長。
+   ⚠ margin: 0 ＋ 用 padding 撐開上下留白：同 .dev-member 一致，
+     令呢一行嘅節奏同其他成員區塊一樣（唔可以一處 margin 一處 padding，
+     否則加埋 flex gap 之後兩個距離會唔同）。
+   ⚠ 用 text-align: center ＋ 逐段 inline 排列，而唔用 flex ＋ gap：
+     呢句係「用 ❤ 為澳門培正中學師生打造」一行連續文字，中間夾一個心形，
+     用 flex 就會變成三個獨立 flex item，窄螢幕換行時會斷在「用」同個心之間
+     或者個心同後半句之間，睇落似兩截文字。inline 排列繼承正常嘅斷行規則，
+     換行只會喺中文字之間發生。 */
+.detail-tribute {
+    width: 100%;
+    margin: 0;
+    padding: 16px 0;
+    text-align: center;
+}
+
+.detail-tribute__text {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+/* 心形本體：icons.js 嘅 heart 係 fill: none ＋ stroke: currentColor 嘅線條畫法，
+   呢度用 fill: currentColor 補成實心 —— 即需求原文嗰個實心紅心。
+   ⚠ 唔可以用 ❤️ Emoji 代替：本專案系統 UI 嚴禁 Emoji（字型唔一致、
+     深淺主題下會變彩色水果／愛心，破單色規範）。
+   ⚠ 顏色用 --ios-red（同 .ios-row.is-danger 同源），唔可以硬編 #ff3b30。
+   ⚠ vertical-align: middle ＋ 負 margin 修正：SVG 預設係 baseline 對齊，
+     14px 嘅心會整個浮喺 12px 文字嘅基線之上，睇落似上標。 */
+.detail-tribute__icon {
+    display: inline-block;
+    margin: 0 1px;
+    line-height: 0;
+    vertical-align: middle;
+    color: var(--ios-red);
+}
+
+.detail-tribute__icon svg {
+    display: block;
+    fill: currentColor;
+}
+
+/* ---------- 開發者卡片（「關於我們」頁專用） ----------
+   ⚠ 呢個係「一塊置中嘅個人名牌板」而唔係設定清單：需求指明要擺脫列表感，
+     所以全頁只有「一張」白色大卡，卡內由上至下依次為
+     區塊標題 → 成員（垂直排列）→ 頁尾致敬標語，全部水平置中。
+     ⚠ 舊版係「每位成員一張 .ios-card」—— 幾張同款卡疊埋一齊，
+       睇落仍然係一列清單項，只係換咗皮膚。所以「成員唔可以再各自包卡」。
+   ⚠ .dev-panel 係 .ios-card 嘅內容，所以呢度刻意唔自己畫卡片外框
+     （background／border／border-radius 一律唔寫），交由 .ios-card 提供，
+     否則就會變成「卡片裡面包一張卡」。
+   ⚠ 上下留白用 padding 而唔用 margin：父層 .ios-list（profileListCardHtml
+     產生）本身已經有 6px 上下內距，用 margin 會同佢「相加」而變得隨機，
+     用 padding 則係同一個盒自己嘅內距，數值一眼睇得出最終高度。
+   ⚠ 水平內距 ＝ .ios-card 嘅 14px ＋ 呢度嘅 2px ＝ 卡邊起計 16px。
+     呢個 2px 唔係隨手寫：佢同 .ios-row 嘅 padding: 9px 2px 完全一致，
+     令卡內文字同其他頁嘅清單列落喺同一條線上。
+     ⚠ 亦唔可以「為咗均勻」而改成 14px：咁卡片左右就會各自變成 28px 內距，
+       同一尺寸嘅卡但內容窄一圈，同其他頁嘅卡片唔一致。
+     ⚠ 上面嘅 .detail-callout 係置中文字區塊（唔係卡片、冇左右對齊線），
+       所以「同上一張卡左邊對齊」呢件事本身就唔存在，唔需要為佢調整。 */
+.dev-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 2px 4px;
+    text-align: center;
+}
+
+/* 區塊標題（「開發者」）：卡片頂部嘅灰字分區標籤。
+   ⚠ 灰字 ＋ 置中係需求指定嘅觀感，用 --text-muted 而唔可以硬編中灰：
+     深色主題嘅 --text-muted 係另一個值，硬編就會喺深底上對比不足。
+   ⚠ 字距放大係刻意嘅：呢個係單獨一行嘅區塊標籤（唔係句子），
+     加闊字距先同下面嘅姓名／班別分得開層級。 */
+.dev-panel__title {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+}
+
+/* 一位成員嘅區塊：由上至下垂直置中 —— 圓形頭像 → 姓名 → 班別 → 社交掣列。
+   ⚠ 用 flex column ＋ align-items: center，唔用 text-align: center 就算：
+     text-align 只處理行內文字，社交掣列係 flex 容器，置中唔到。
+   ⚠ width: 100% 係必要嘅：父層 .dev-panel 係 align-items: center，
+     唔寫就會 shrink-to-fit，下面嗰條 1px 分隔線只會畫到頭像咁闊。
+   ⚠ 用 padding 而唔用 gap 排上下距離：頭像、姓名、班別三者嘅距離
+     刻意唔一樣（姓名貼班別較近），gap 只可以全部一樣。 */
+.dev-member {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 0;
+}
+
+/* 成員之間、以及最後一位同頁尾標語之間嘅分隔線。
+   ⚠ 需求原文寫「border-top: 1px solid #E5E5EA」，呢度刻意改用
+     var(--lg-line)：硬編 #E5E5EA 喺深色主題下會變成一條發光嘅白線，
+     同全站其他 hairline（.ios-row、.detail-stat 等）嘅語言完全唔一致。
+     淺色主題嘅 --lg-line（rgba(0,0,0,0.08)）疊喺白卡上就係 #EBEBEB，
+     同需求嗰隻 #E5E5EA 視覺上係同一條線。
+   ⚠ 厚度用 1px 而唔跟其他 hairline 嘅 0.5px：呢度分隔嘅係「兩位唔同成員」
+     兩個大區塊，比其他地方嘅「同一組內嘅兩列」需要更清楚嘅斷句。
+   ⚠ 用相鄰選擇器（+）而唔用 :not(:first-child)／:not(:last-child)：
+     標題唔應該有線（第一個子項係 .dev-panel__title），而線只可以出現喺
+     「成員之後」—— 相鄰寫法一次過講清楚呢兩件事，唔會漏。 */
+.dev-member + .dev-member,
+.dev-member + .detail-tribute {
+    border-top: 1px solid var(--lg-line);
+}
+
+/* 頭像：預設係姓名縮寫；成員填咗 avatar 就改用相片（見下面 --photo）。
+   ⚠ 漸變沿用 .auth-hero__badge 嘅同一組色（紫 → 粉 → 青），
+     令「品牌色」全站只有一個定義源頭。
+   ⚠ 呢個係「身份標記」而唔係設定頁圖示：設定頁圖示必須單色線條
+     （見 .ios-row__icon 註解，彩色底框已全面移除），但頭像／品牌徽章
+     唔屬於嗰條規則嘅適用範圍。
+   ⚠ 64px 而唔跟舊版嘅 48px：呢個區塊係「一張個人名牌」，頭像係視覺重心；
+     48px 配 17px 姓名會令頭像縮到同文字差不多大，睇落似清單項嘅小圓點。
+   ⚠ margin-bottom 而唔用父層 gap：下面三個距離（頭像→姓名→班別→社交列）
+     刻意唔一樣，gap 只可以全部一樣（見 .dev-member 同一段註解）。 */
+.dev-member__avatar {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 0.3px;
+    color: #ffffff;
+    background: linear-gradient(140deg, #6a5cff, #ff5f9e 55%, #00d4ff);
+    box-shadow: 0 6px 18px rgba(106, 92, 255, 0.32);
+    /* 縮寫係裝飾性文字：唔應該可以被選取或複製 */
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 相片頭像（成員填咗 avatar）：<img> 用絕對定位蓋喺縮寫上面。
+   ⚠ 用「蓋住」而唔係「取代」縮寫：資產缺失或改名時，底下嘅縮寫仲喺度，
+     卡面唔會變成一個空白圈 —— 呢個係 JS 端刻意保留縮寫嘅原因，
+     所以呢度唔可以加 display: none 之類去抹走嗰層文字。
+   ⚠ 容器加 position: relative ＋ overflow: hidden：
+     · relative 係 absolute 子元素嘅定位基準；
+     · overflow: hidden 令相片可靠地被容器嘅 border-radius: 50% 剪成圓形。
+   ⚠ 相片自己都寫 border-radius: 50%：容器剪一次、相片自己剪一次，
+     兩層係刻意嘅冗餘 —— 容器嘅 border-radius 主要係剪自己嘅漸變背景，
+     相片則要確保貼住圓邊（唔寫就會見到四個直角撐出圓形之外）。
+   ⚠ object-fit: cover 而唔係默認嘅 fill：目前兩張原圖都係正方形，
+     但若日後有人換咗一張長方形相片，fill 會把面孔壓扁；
+     cover 會置中裁切，寧願裁走邊位都唔會變形。
+   ⚠ 相片喺容器「內」，所以容器嘅 box-shadow（紫色光暈）仍然喺相片
+     底下透出，同文字縮寫版視覺一致，唔會出現兩種唔同嘅頭像質感。 */
+.dev-member__avatar--photo {
+    position: relative;
+    overflow: hidden;
+}
+
+.dev-member__avatar--photo .dev-member__avatar-img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* 姓名列：姓名 ＋ 已驗證標章排成同一條水平線（inline-flex / center / gap 6px）。
+   ⚠ 一定要係「姓名同標章共用嘅一條 flex 列」而唔係兩個獨立 inline 元素：
+     純 inline 排法會令標章跟住文字基線落，同 800 字重嘅姓名對唔齊，
+     中間亦只可以靠空格或 margin 撐開（gap 先係可控嘅固定 6px）。
+   ⚠ 呢條列係 .dev-member（flex column ／ align-items: center）嘅 flex item，
+     所以佢會 shrink-to-fit 再由父層置中 —— 「名 ＋ 章」係一齊置中嘅，
+     唔會出現姓名偏左、章孤零零吊喺右邊嘅情況。
+   ⚠ min-width: 0 係 ellipsis 生效嘅關鍵：flex item 預設 min-width: auto
+     會撐到內容闊度，下面 .dev-member__name 嘅 text-overflow 就永遠觸發唔到，
+     超長姓名會直接推爆卡片（卡片係 overflow: hidden）。
+   ⚠ justify-content: center ＋ max-width: 100%：列本身唔可以超出卡內寬度。 */
+.dev-member__name-row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* 姓名：區塊內最重嘅一行（黑字加粗）。
+   ⚠ max-width ＋ 省略號係防禦性嘅：姓名由 profile-content.js 提供，
+     日後有人填一個超長名都唔會撐爆卡片寬度（卡片係 overflow: hidden，
+     冇呢兩句就會直接切字，連「被截斷」都睇唔出）。
+   ⚠ min-width: 0：本身上面 .dev-member__name-row 已經有，呢度再寫一次係
+     因為 .dev-member__name 自己都係 flex item（由 name-row 包住），
+     省略號要生效同樣要覆寫 min-width: auto；漏咗就會變成
+     「截唔斷、直接撐爆卡片」。 */
+.dev-member__name {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    color: var(--text-main);
+}
+
+/* 已驗證標章：緊貼姓名右側嘅藍色實心認證章（icons.js 嘅 verifiedBadge）。
+   ⚠ 顏色只喺呢度定義（--ios-blue），圖示路徑本身用 currentColor 做章底 ——
+     硬編第二隻藍會令日後改 --ios-blue 時標章走音。
+   ⚠ flex: 0 0 auto 係必要嘅：圖形唔可以隨姓名壓縮，一壓就會變成橢圓，
+     一眼就睇得出「呢個章係被擠扁」，比冇章更差。
+   ⚠ 尺寸／對齊靠 .dev-member__name-row 嘅 align-items: center，
+     呢度唔加 margin-top／vertical-align 呢類修正值 —— 有咗 flex 對齊，
+     任何垂直微調值都只會喺換字體或改字號時變成偏差。
+   ⚠ 唔加 title／aria-hidden：語意（role="img" ＋ aria-label="已驗證"）
+     由 profileDevMemberHtml() 提供，CSS 呢層再加只會重複朗讀。 */
+.dev-member__badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ios-blue);
+}
+
+/* 標章圖示本體：display: block 消除 inline 元素嘅基線空隙，
+   同 .dev-social__link svg 一樣嘅理由 —— 唔寫就會偏上，睇落唔置中。 */
+.dev-member__badge svg {
+    display: block;
+}
+
+/* 班別（例如「初二正」）：姓名對落一行嘅藍字。
+   ⚠ 刻意「唔」做成一粒 Badge（膠囊底 ＋ 邊框）：需求指明呢度只要藍字，
+     加咗底色就會喺卡內多出一層「標籤」質感，同整塊名牌板嘅簡潔觀感衝突。
+   ⚠ 用 --ios-blue 而唔用中性灰：呢個係「有意義嘅分類標記」，屬於全站
+     色票容許嘅用法；灰色嘅話喺深色主題下同 .ios-row__value 撞色，
+     睇落似一段被截斷嘅文字而唔似班別。
+   ⚠ margin-top 用正值而唔用負值修正：父層已經冇 gap，呢度直接表達
+     「姓名同班別貼近」呢件事，唔需要靠負 margin 抵消上一層嘅 gap。 */
+.dev-member__class {
+    max-width: 100%;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--ios-blue);
+}
+
+/* 社交掣列：成員區塊底部一行，橫向置中。
+   呢個係改版嘅核心 —— 舊版社交連結逐條排成 .ios-row（有 chevron、
+   有 hairline、每條 52px 高），一張卡就被撐到三四行，睇落完全係一個
+   預設列表；改成橫向 Icon 掣之後一位成員只需要一個區塊。
+   ⚠ justify-content: center 係需求指定嘅「按鈕列置中」；父層
+     align-items: center 已經令整列水平居中，呢句係防止日後社交項目
+     多到超出一行時，多出嘅一項會靠左排。
+   ⚠ flex-wrap 唔加：成員最多三個連結（見 PROFILE_DEVELOPER_MEMBERS），
+     一行 3 × 40px ＋ 2 × 12px 間距遠窄過卡內可用寬度，加 wrap 只會
+     製造一個永遠唔會觸發嘅分支。 */
+.dev-social {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+/* 社交 Icon 掣：40px 圓角方形底 ＋ 單色線條圖示。
+   ⚠ 刻意係 <a> 而唔係 <button>（見 profileDevMemberHtml）：目的地本來就係
+     一條網址，連結語意先啱。所以呢度亦要自己清 text-decoration／顏色，
+     唔可以靠 button 嘅預設值。
+   ⚠ 用圓角方形（12px）而唔係圓形：呢幾個掣係「App 圖示」嘅隱喻
+     （IG / GitHub / 網站），模板圖上亦係圓角方形；而圓形喺同一張卡內
+     已經係頭像嘅語言，兩者形狀一樣會令頭像唔再突出。
+   ⚠ 顏色／底色用同一隻 --ios-blue 嘅低透明度，同全站其他藍色標記一致；
+     硬編第二隻藍會令日後改 --ios-blue 時走音。
+   ⚠ 40px 係刻意嘅折衷：HIG 建議 44px 觸控目標，但呢度係卡內一行三個
+     次要動作，做到 44px 會令卡片高度同 64px 頭像失衡；40px 配合 12px
+     間距，實際誤觸率已經好低。
+   ⚠ 唔可以加 box-shadow 或者邊框：全站唯一嘅「浮起」層次係 .ios-card 本身，
+     喺卡內再疊一層陰影會同卡片外框嘅陰影重疊。
+   ⚠ transition 只做 transform／background-color：加埋 width 或者 color
+     就會喺撳嗰下觸發 layout，出現一下卡頓。
+   ⚠ 可撳性（用無頭瀏覽器實測後補）：曾經有人報「社群掣撳落冇反應」。
+     實測方式係兩個尺寸（手機 390x844、桌面 1180x860）各開一個 iframe，
+     用真實函式渲染呢張卡，再逐條掣做 elementFromPoint 命中測試
+     ＋ 派發真的 pointer／mouse 事件。結果：5 條 <a> 全部命中掣本體、
+     冇任何圖層蓋住、事件亦冇被 preventDefault —— 即係話喺呢個版本
+     點擊係正常嘅。但下面三句仍然要寫，用意係由「目前碰巧成立」
+     變成「寫死嘅保證」：
+       · position: relative ＋ z-index: 1：卡內日後再加裝飾圖層
+         （例如 .detail-glow 那類 absolute 元素），如果佢冇 pointer-events:
+         none，就會蓋住個掣；畀個掣一個明確層級，先唔會靜靜地死咗。
+       · pointer-events: auto：pointer-events 係繼承屬性，若有人喺卡片層
+         寫咗 none（例如整張卡 fade out），子元素會一齊被鎖死；
+         喺掣呢層明確寫返 auto，就唔會連帶中招。
+     三句都唔會改變現有外觀：position 由 static 變 relative 唔動版面、
+     z-index: 1 喺卡內冇對手、pointer-events 本來就係 auto。 */
+.dev-social__link {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    color: var(--ios-blue);
+    background-color: rgba(10, 132, 255, 0.14);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.16s ease, background-color 0.16s ease;
+}
+
+/* 按壓回饋沿用 .wa-iconbtn 嘅 scale(0.92)，同時加深底色 ——
+   只縮放唔加深，深色主題下幾乎睇唔出有反應。 */
+.dev-social__link:active {
+    transform: scale(0.92);
+    background-color: rgba(10, 132, 255, 0.26);
+}
+
+/* 圖示本體：display: block 消除 inline 元素嘅基線空隙，
+   唔寫嘅話圖示喺圓角方塊入面會偏上，睇落唔置中。 */
+.dev-social__link svg {
+    display: block;
+}
+
+/* ================= 6. 切換帳號清單 ================= */
+.accounts-head {
+    text-align: center;
+    padding: 8px 8px 18px;
+}
+
+.accounts-head__title {
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--text-main);
+    margin-bottom: 5px;
+    letter-spacing: -0.3px;
+}
+
+.accounts-head__desc {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.accounts-list { display: flex; flex-direction: column; gap: 9px; }
+
+.acc-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 18px;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    font-family: var(--font-family);
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.acc-item:hover { background-color: rgba(255, 255, 255, 0.16); }
+.acc-item:active { transform: scale(0.98); }
+
+:root[data-theme="light"] .acc-item {
+    background-color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.05);
+}
+
+.acc-item.is-current {
+    border-color: rgba(106, 92, 255, 0.75);
+    background-color: rgba(106, 92, 255, 0.18);
+    box-shadow: 0 0 0 1px rgba(106, 92, 255, 0.35);
+}
+
+.acc-item__avatar {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--bg-secondary);
+    border: 1.5px solid rgba(255, 255, 255, 0.18);
+}
+
+.acc-item__info { flex: 1; min-width: 0; }
+
+.acc-item__name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--text-main);
+    letter-spacing: -0.2px;
+    margin-bottom: 3px;
+}
+
+.acc-item__name span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.acc-item__meta {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.acc-item__check {
+    font-size: 15px;
+    font-weight: 900;
+    color: #7b6cff;
+    flex-shrink: 0;
+}
+
+.acc-item__remove {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--text-muted);
+    background-color: rgba(128, 128, 128, 0.16);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.acc-item__remove:hover {
+    background-color: rgba(255, 59, 48, 0.9);
+    color: #fff;
+}
+
+.acc-item--add {
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-main);
+    background-color: transparent;
+    border: 1.5px dashed rgba(255, 255, 255, 0.22);
+}
+
+.acc-item--add:hover { background-color: rgba(255, 255, 255, 0.08); }
+
+:root[data-theme="light"] .acc-item--add { border-color: rgba(0, 0, 0, 0.16); }
+
+.acc-item__icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(140deg, #6a5cff, #ff5f9e 60%, #00d4ff);
+}
+
+/* ================= 7. Toast ================= */
+.profile-toast {
+    /* 已移出 .profile-overlay，改用 fixed 令彈窗關閉後仍可顯示提示 */
+    position: fixed;
+    left: 50%;
+    /* 底部安全區域：瀏海機避免提示被 Home Indicator 壓住 */
+    bottom: 34px;
+    bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 18px);
+    /* ⚠ 必須高於 #profile-overlay（10000），否則個人中心發出嘅提示會被面板蓋住。
+       舊版要再高過模態抽屜（10100）—— 抽屜已刪除，呢個 10200 保留係為咗
+       同一個「永遠喺最上層」嘅語意，亦方便日後再加高層容器時唔會撞。 */
+    z-index: 10200;
+    max-width: 82%;
+    padding: 11px 20px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.78);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.profile-toast.is-on {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* ================= 8. 響應式 ================= */
+@media (max-width: 500px) {
+    .profile-overlay { padding: 0; }
+
+    .profile-panel {
+        max-width: 100%;
+        max-height: 100%;
+        height: 100dvh;
+        border-radius: 0;
+        border: none;
+        /* 頂部安全區域：避開動態島／狀態欄。
+           第一行係舊瀏覽器保底值，之後才用 env() 精算 */
+        padding-top: 44px;
+        padding-top: calc(constant(safe-area-inset-top) + 10px);
+        padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+    }
+
+    .profile-scroll { padding-bottom: max(28px, env(safe-area-inset-bottom, 0px)); }
+
+    /* 真機：次頁面升級成真正嘅全螢幕 fixed 層 —— 同 iOS 原生 Push 頁面一致。
+       ⚠ 呢度一定要用 position: fixed + top/left: 0 + width/height: 100%，
+         唔可以用 width: 100vw。
+         100vw 係「viewport 連滾動條」嘅闊度，而 fixed 元素嘅包含塊（ICB）
+         係「唔計滾動條」嘅可視區 —— 兩者一相差，次頁面就會比螢幕闊
+         十幾 px，卡片右邊同數據（例如 380.90 GB）就會被切走。
+         更嚴重嘅情況：若祖先（.profile-panel）因為 backdrop-filter 而
+         成為包含塊，100vw 更加係由面板左邊界起算整個視窗闊度，
+         必然向右爆出，正好就係用戶見到嘅「數據被截斷」。
+         width/height: 100% 就冇呢個問題：包含塊係面板就等於面板、
+         係視窗就等於視窗，兩種情況都剛好鋪滿，一個 px 都唔會多。 */
+    .sub-page {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .header-user { max-width: 132px; }
+    .header-user__name { max-width: 74px; }
+}
+
+@media (max-width: 360px) {
+    .header-user__name { display: none; }
+    /* 只顯示頭像時置中，維持 44px 觸控熱區 */
+    .header-user { padding: 0 8px; justify-content: center; }
+}
+
+/* ⚠ 原本呢度仲有兩段只服務模態抽屜嘅響應式規則（≤360px 收窄抽屜內距、
+   ≥561px 把抽屜變成懸浮卡片）—— 抽屜已刪除，兩段規則一併移除。
+   子頁面本身係 .ios-home 流式版面，會自動跟隨面板闊度，
+   唔需要（亦唔應該）為個別頁面再寫死內距。 */
+
+/* 尊重系統「減少動態效果」設定：開關與項目按壓一律唔做動畫 */
+@media (prefers-reduced-motion: reduce) {
+    .ios-row,
+    .ios-switch,
+    .ios-switch::after,
+    .detail-action { transition: none; }
+}
+

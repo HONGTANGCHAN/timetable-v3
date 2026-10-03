@@ -2,7 +2,7 @@
 // Service Worker（純靜態、無後端、無第三方 API）
 // ============================================================
 
-const CACHE_NAME = 'timetable-demo-v5.4.0';
+const CACHE_NAME = 'timetable-demo-v5.5.0';
 
 const PRECACHE = [
     './',

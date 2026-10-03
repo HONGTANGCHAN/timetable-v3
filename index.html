@@ -66,7 +66,7 @@
     <link rel="icon" type="image/svg+xml" href="assets/images/app-logo.svg?v=3.0.0">
     <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
 
-    <link rel="stylesheet" href="styles/main.css?v=3.4.0">
+    <link rel="stylesheet" href="styles/main.css?v=3.5.0">
     <link rel="stylesheet" href="styles/icons.css?v=3.0.0">
     <link rel="stylesheet" href="styles/themes/dark.css?v=3.0.0">
     <link rel="stylesheet" href="styles/themes/light.css?v=3.0.0">
@@ -597,7 +597,7 @@
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-        navigator.serviceWorker.register('service-worker.js?v=5.4.0')
+        navigator.serviceWorker.register('service-worker.js?v=5.5.0')
             .then(function (registration) { registration.update(); })
             .catch(function (error) { console.log('Service Worker 註冊失敗:', error); });
     });

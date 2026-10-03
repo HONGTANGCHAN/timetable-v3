@@ -604,7 +604,19 @@ body > *:not(.phone-mockup) {
 
     #app-content {
         padding: var(--spacing-sm) var(--spacing-md);
-        padding-bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom, 0px));
+        /* 預留底部導航高度，避免最後一張卡或最後一項被固定導航遮住。 */
+        padding-bottom: calc(102px + env(safe-area-inset-bottom, 0px));
         overflow: visible;
+    }
+
+    #bottom-nav {
+        position: fixed;
+        left: 50%;
+        right: auto;
+        bottom: 0;
+        width: 100%;
+        max-width: 440px;
+        transform: translateX(-50%);
+        z-index: 1000;
     }
 }
